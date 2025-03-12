@@ -10,53 +10,48 @@ const User = require('./models/User');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
-app.use(express.json());
-app.use(express.static(path.join(__dirname, '../client'))); // Serve static files
-app.use('/admin', express.static(path.join(__dirname, '../client/admin'))); // Serve admin files
+// Add express.urlencoded middleware
+app.use(express.json()); // For JSON requests
+app.use(express.urlencoded({ extended: true })); // For form submissions
 
-// Session Middleware
+app.use(express.static(path.join(__dirname, '../client')));
+app.use('/admin', express.static(path.join(__dirname, '../client/admin')));
+
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'ooh-la-la-secret', // A little secret between us, hmm? 😉
+  secret: process.env.SESSION_SECRET || 'your-secret-key',
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: false } // Set to true with HTTPS, darling
+  cookie: { secure: false }
 }));
 
-// Set EJS as the view engine
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, '../client/admin/views'));
 
-// MongoDB Connection
 mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(() => console.log('Connected to MongoDB, ready for you!'))
-  .catch(err => console.error('MongoDB error:', err));
+  .then(() => console.log('Connected to MongoDB'))
+  .catch(err => console.error('MongoDB connection error:', err));
 
 app.use('/api', eventRoutes);
 
-// Routes with a Flirty Touch
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '../client/index.html'));
-});
-
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, '../client/index.html')));
 app.get('/admin', (req, res) => {
-  if (!req.session.user) return res.redirect('/admin/login'); // Gotta log in to see me, sweetie!
+  if (!req.session.user) return res.redirect('/admin/login');
   res.render('index', { title: 'Dashboard - SB Admin', user: req.session.user });
 });
-
-app.get('/admin/login', (req, res) => {
-  res.render('login', { title: 'Login - SB Admin' });
-});
+app.get('/admin/login', (req, res) => res.render('login', { title: 'Login - SB Admin' }));
 
 app.post('/admin/login', async (req, res) => {
   const { email, password } = req.body;
-  const user = await User.findOne({ Email: email });
-  if (user && user.Password === password) { // Time for bcrypt later, big guy!
+  console.log('Login attempt:', { email, password });
+  const user = await User.findOne({ Email: { $regex: new RegExp(`^${email}$`, 'i') } });
+  console.log('User found:', user);
+  if (user && user.Password === password) {
+    console.log('Password match! Logging in...');
     req.session.user = user;
-    req.session.selectedCompanyID = user.DefaultCompanyID || user.Companies[0]; // Default flirtation
+    req.session.selectedCompanyID = user.DefaultCompanyID || user.Companies[0];
     return res.redirect('/admin');
   }
-  res.send('Oops, wrong move—try again, handsome!');
+  res.render('login', { title: 'Login - SB Admin', error: 'Invalid email or password' });
 });
 
 app.get('/admin/select-company', (req, res) => {
@@ -68,12 +63,9 @@ app.post('/admin/select-company', (req, res) => {
   const { companyID } = req.body;
   if (req.session.user.Companies.includes(companyID)) {
     req.session.selectedCompanyID = companyID;
-    return res.redirect('/admin'); // Back to my arms!
+    return res.redirect('/admin');
   }
-  res.send('Naughty, that’s not your company!');
+  res.status(400).send('Invalid company');
 });
 
-// Existing routes...
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}, waiting for you, love!`);
-});
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

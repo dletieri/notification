@@ -1,0 +1,24 @@
+<%- include('partials/header', { title: 'Select Company - SB Admin' }) %>
+  <div class="container-fluid">
+    <h1 class="h3 mb-4 text-gray-800">Select Company</h1>
+    <div class="card shadow mb-4">
+      <div class="card-body">
+        <form method="POST" action="/admin/select-company">
+          <div class="form-group">
+            <label for="companyID">Company</label>
+            <select class="form-control" id="companyID" name="companyID" required>
+              <% companies.forEach(company => { %>
+                <option value="<%= company %>"><%= company %></option> <!-- Adjust to display company name -->
+              <% }) %>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary">Select</button>
+        </form>
+      </div>
+    </div>
+  </div>
+<%- include('partials/footer') %>
+</div>
+</div>
+</body>
+</html>

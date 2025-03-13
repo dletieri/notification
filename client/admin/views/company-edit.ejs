@@ -1,0 +1,39 @@
+<%- include('partials/header', { title: title }) %>
+<div id="wrapper">
+  <%- include('partials/sidebar', { currentPage: currentPage }) %>
+  <div id="content-wrapper" class="d-flex flex-column">
+    <div id="content">
+      <%- include('partials/topbar', { user: user }) %>
+      <div class="container-fluid">
+        <h1 class="h3 mb-4 text-gray-800">Edit Company</h1>
+        <div class="card shadow mb-4">
+          <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Edit Company Details</h6>
+          </div>
+          <div class="card-body">
+            <form method="POST" action="/admin/companies/edit/<%= company._id %>" class="user">
+              <div class="form-group">
+                <input type="text" class="form-control" id="name" name="name" value="<%= company.Name %>" required>
+              </div>
+              <div class="form-group">
+                <input type="text" class="form-control" id="registrationNumber" name="registrationNumber" value="<%= company.CompanyRegistrationNumber || '' %>">
+              </div>
+              <div class="form-group">
+                <input type="text" class="form-control" id="address" name="address" value="<%= company.Address || '' %>">
+              </div>
+              <div class="form-group">
+                <input type="text" class="form-control" id="phone" name="phone" value="<%= company.Phone || '' %>">
+              </div>
+              <div class="form-group">
+                <input type="email" class="form-control" id="email" name="email" value="<%= company.Email || '' %>">
+              </div>
+              <button type="submit" class="btn btn-primary btn-user">Update Company</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+    <%- include('partials/footer') %>
+  </div>
+</div>
+<%- include('partials/scripts') %>

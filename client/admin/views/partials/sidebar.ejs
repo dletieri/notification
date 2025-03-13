@@ -1,27 +1,92 @@
+<!-- Sidebar -->
 <ul class="navbar-nav bg-gradient-primary sidebar sidebar-dark accordion" id="accordionSidebar">
-    <hr class="sidebar-divider my-0">
-    <li class="nav-item">
-      <a class="nav-link" href="/admin">
-        <i class="fas fa-fw fa-tachometer-alt"></i>
-        <span>Dashboard</span>
-      </a>
-    </li>
-    <hr class="sidebar-divider">
-    <div class="sidebar-heading">Actions</div>
-    <li class="nav-item">
-      <a class="nav-link" href="/admin/create">
-        <i class="fas fa-fw fa-plus"></i>
-        <span>Create Object</span>
-      </a>
-    </li>
-    <li class="nav-item">
-      <a class="nav-link" href="/admin/objects">
-        <i class="fas fa-fw fa-list"></i>
-        <span>View Objects</span>
-      </a>
-    </li>
-    <hr class="sidebar-divider d-none d-md-block">
-    <div class="text-center d-none d-md-inline">
-      <button class="rounded-circle border-0" id="sidebarToggle"></button>
+  <!-- Sidebar - Brand -->
+  <a class="sidebar-brand d-flex align-items-center justify-content-center" href="/admin">
+    <div class="sidebar-brand-icon rotate-n-15">
+      <i class="fas fa-laugh-wink"></i>
     </div>
-  </ul>
+    <div class="sidebar-brand-text mx-3">SB Admin <sup>2</sup></div>
+  </a>
+
+  <!-- Divider -->
+  <hr class="sidebar-divider my-0">
+
+  <!-- Nav Item - Dashboard -->
+  <li class="nav-item <%= currentPage === 'dashboard' ? 'active' : '' %>">
+    <a class="nav-link" href="/admin">
+      <i class="fas fa-fw fa-tachometer-alt"></i>
+      <span>Dashboard</span>
+    </a>
+  </li>
+
+  <!-- Divider -->
+  <hr class="sidebar-divider">
+
+  <!-- Heading -->
+  <div class="sidebar-heading">Management</div>
+
+  <!-- Nav Item - Companies -->
+  <li class="nav-item <%= currentPage === 'companies' ? 'active' : '' %>">
+    <a class="nav-link" href="/admin/companies">
+      <i class="fas fa-fw fa-building"></i>
+      <span>Companies</span>
+    </a>
+  </li>
+
+  <!-- Nav Item - Users -->
+  <li class="nav-item <%= currentPage === 'users' ? 'active' : '' %>">
+    <a class="nav-link" href="/admin/users">
+      <i class="fas fa-fw fa-users"></i>
+      <span>Users</span>
+    </a>
+  </li>
+
+  <!-- Nav Item - Categories -->
+  <li class="nav-item <%= currentPage === 'categories' ? 'active' : '' %>">
+    <a class="nav-link" href="/admin/categories">
+      <i class="fas fa-fw fa-folder"></i>
+      <span>Categories</span>
+    </a>
+  </li>
+
+  <!-- Nav Item - Environment Objects -->
+  <li class="nav-item <%= currentPage === 'environment-objects' ? 'active' : '' %>">
+    <a class="nav-link" href="/admin/environment-objects">
+      <i class="fas fa-fw fa-box"></i>
+      <span>Environment Objects</span>
+    </a>
+  </li>
+
+  <!-- Nav Item - Event Types -->
+  <li class="nav-item <%= currentPage === 'event-types' ? 'active' : '' %>">
+    <a class="nav-link" href="/admin/event-types">
+      <i class="fas fa-fw fa-bell"></i>
+      <span>Event Types</span>
+    </a>
+  </li>
+
+  <!-- Nav Item - Events -->
+  <li class="nav-item <%= currentPage === 'events' ? 'active' : '' %>">
+    <a class="nav-link" href="/admin/events">
+      <i class="fas fa-fw fa-calendar"></i>
+      <span>Events</span>
+    </a>
+  </li>
+
+  <!-- Nav Item - Notifications -->
+  <li class="nav-item <%= currentPage === 'notifications' ? 'active' : '' %>">
+    <a class="nav-link" href="/admin/notifications">
+      <i class="fas fa-fw fa-envelope"></i>
+      <span>Notifications</span>
+    </a>
+  </li>
+
+  <!-- Divider -->
+  <hr class="sidebar-divider d-none d-md-block">
+
+  <!-- Sidebar Toggler (Sidebar) -->
+  <div class="text-center d-none d-md-inline">
+    <button class="rounded-circle border-0" id="sidebarToggle"></button>
+  </div>
+</ul>
+<!-- End of Sidebar -->

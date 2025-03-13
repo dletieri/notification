@@ -20,22 +20,37 @@ const checkCompany = (req, res, next) => {
 };
 
 // Company Routes
-router.get('/companies', checkAuth, async (req, res) => {
+router.get('/companies', async (req, res) => {
+  console.log('GET /api/companies received:', req.query); // Debug log
   try {
-    const companies = await Company.find({ _id: { $in: req.session.user.Companies } });
+    let query = {};
+    if (req.query.companyId) {
+      query._id = req.query.companyId;
+    }
+    const companies = await Company.find(query);
+    console.log('Found companies:', companies); // Debug log
     res.json(companies);
   } catch (error) {
-    res.status(500).json({ error: `Oops, something went wrong: ${error.message}` });
+    console.error('Error fetching companies:', error);
+    res.status(500).send('Error fetching companies');
   }
 });
 
-router.post('/companies', checkAuth, async (req, res) => {
+router.post('/companies', async (req, res) => {
+  const { Name, CompanyRegistrationNumber, Address, Phone, Email } = req.body;
+  if (!Name) return res.status(400).send('Company name is required');
   try {
-    const company = new Company(req.body);
+    const company = new Company({
+      Name,
+      CompanyRegistrationNumber,
+      Address,
+      Phone,
+      Email
+    });
     await company.save();
     res.status(201).json(company);
   } catch (error) {
-    res.status(400).json({ error: `Naughty input, darling: ${error.message}` });
+    res.status(400).send(error.message);
   }
 });
 

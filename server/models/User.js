@@ -7,7 +7,9 @@ const userSchema = new mongoose.Schema({
   Email: { type: String, required: true, unique: true },
   Password: { type: String, required: true }, // To be hashed later with bcrypt
   Role: String,
+  IsAdmin: { type: Boolean, default: false }, // Add this if not present
   RegistrationDate: { type: Date, default: Date.now }
 });
 
 module.exports = mongoose.model('User', userSchema);
+

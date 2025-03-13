@@ -78,13 +78,19 @@ router.put('/companies/:id', checkAuth, async (req, res) => {
   }
 });
 
-router.delete('/companies/:id', checkAuth, async (req, res) => {
+router.delete('/companies/:id', async (req, res) => {
+  console.log('DELETE /api/companies/:id received with ID:', req.params.id); // Debug log
   try {
-    const company = await Company.findOneAndDelete({ _id: req.params.id, _id: { $in: req.session.user.Companies } });
-    if (!company) return res.status(404).json({ error: 'Company gone missing!' });
-    res.json({ message: 'Company deleted, you bad boy!' });
+    const company = await Company.findByIdAndDelete(req.params.id);
+    if (!company) {
+      console.log('Company not found for ID:', req.params.id); // Debug log
+      return res.status(404).json({ error: 'Company gone missing!' });
+    }
+    console.log('Company deleted:', company); // Debug log
+    res.status(200).json({ message: 'Company deleted successfully' });
   } catch (error) {
-    res.status(500).json({ error: `Delete failed: ${error.message}` });
+    console.error('Error deleting company:', error); // Debug log
+    res.status(500).json({ error: error.message });
   }
 });
 

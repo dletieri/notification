@@ -130,22 +130,25 @@
       });
     });
 
-    // Delete company
-    $(document).on('click', '.delete-btn', function() {
-      if (confirm('Are you sure you want to delete this company?')) {
-        let id = $(this).data('id');
-        $.ajax({
-          url: '/api/companies/' + id,
-          method: 'DELETE',
-          success: function() {
-            loadCompanies();
-          },
-          error: function(xhr) {
-            alert('Error deleting company: ' + xhr.responseText);
-          }
-        });
+// Delete company
+$(document).on('click', '.delete-btn', function() {
+  if (confirm('Are you sure you want to delete this company?')) {
+    let id = $(this).data('id');
+    console.log('Attempting to delete company with ID:', id); // Debug log
+    $.ajax({
+      url: '/api/companies/' + id,
+      method: 'DELETE',
+      success: function() {
+        console.log('Company deleted successfully'); // Debug log
+        loadCompanies();
+      },
+      error: function(xhr) {
+        console.error('Error deleting company:', xhr.responseText); // Debug log
+        alert('Error deleting company: ' + xhr.responseText);
       }
     });
+  }
+});
 
     // Initial load
     loadCompanies();

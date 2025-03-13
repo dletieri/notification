@@ -148,17 +148,32 @@ app.get('/admin/notifications', (req, res) => {
   });
 });
 
+// Existing edit routes
 app.get('/admin/companies/edit/:id', async (req, res) => {
   if (!req.session.user) return res.redirect('/admin/login');
-  const company = await Company.findById(req.params.id);
-  if (!company) return res.status(404).send('Company not found');
-  res.render('company-edit', {
-    title: 'Edit Company - SB Admin',
-    user: req.session.user,
-    company: company,
-    currentPage: 'companies',
-    selectedCompanyID: req.session.selectedCompanyID
-  });
+  if (req.params.id === 'new') {
+    // Handle "Add New Company" case
+    res.render('company-edit', {
+      title: 'Add Company - SB Admin',
+      user: req.session.user,
+      company: {}, // Empty object for new company
+      currentPage: 'companies',
+      selectedCompanyID: req.session.selectedCompanyID,
+      isNew: true // Flag for new company
+    });
+  } else {
+    // Handle "Edit Existing Company" case
+    const company = await Company.findById(req.params.id);
+    if (!company) return res.status(404).send('Company not found');
+    res.render('company-edit', {
+      title: 'Edit Company - SB Admin',
+      user: req.session.user,
+      company: company,
+      currentPage: 'companies',
+      selectedCompanyID: req.session.selectedCompanyID,
+      isNew: false // Flag for existing company
+    });
+  }
 });
 
 app.post('/admin/companies/edit/:id', async (req, res) => {
@@ -175,6 +190,24 @@ app.post('/admin/companies/edit/:id', async (req, res) => {
     res.redirect('/admin/companies');
   } catch (error) {
     res.status(500).send('Error updating company: ' + error.message);
+  }
+});
+
+// New route for adding a company
+app.post('/admin/companies/add', async (req, res) => {
+  const { name, registrationNumber, address, phone, email } = req.body;
+  try {
+    const company = new Company({
+      Name: name,
+      CompanyRegistrationNumber: registrationNumber,
+      Address: address,
+      Phone: phone,
+      Email: email
+    });
+    await company.save();
+    res.redirect('/admin/companies');
+  } catch (error) {
+    res.status(500).send('Error creating company: ' + error.message);
   }
 });
 

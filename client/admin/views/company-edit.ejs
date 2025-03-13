@@ -5,29 +5,30 @@
     <div id="content">
       <%- include('partials/topbar', { user: user }) %>
       <div class="container-fluid">
-        <h1 class="h3 mb-4 text-gray-800">Edit Company</h1>
+        <h1 class="h3 mb-4 text-gray-800"><%= isNew ? 'Add Company' : 'Edit Company' %></h1>
         <div class="card shadow mb-4">
           <div class="card-header py-3">
-            <h6 class="m-0 font-weight-bold text-primary">Edit Company Details</h6>
+            <h6 class="m-0 font-weight-bold text-primary"><%= isNew ? 'Add Company Details' : 'Edit Company Details' %></h6>
           </div>
           <div class="card-body">
-            <form method="POST" action="/admin/companies/edit/<%= company._id %>" class="user">
+            <form method="POST" action="<%= isNew ? '/admin/companies/add' : '/admin/companies/edit/' + company._id %>" class="user">
               <div class="form-group">
-                <input type="text" class="form-control" id="name" name="name" value="<%= company.Name %>" required>
+                <input type="text" class="form-control" id="name" name="name" value="<%= isNew ? '' : company.Name %>" placeholder="Company Name" required>
               </div>
               <div class="form-group">
-                <input type="text" class="form-control" id="registrationNumber" name="registrationNumber" value="<%= company.CompanyRegistrationNumber || '' %>">
+                <input type="text" class="form-control" id="registrationNumber" name="registrationNumber" value="<%= isNew ? '' : (company.CompanyRegistrationNumber || '') %>" placeholder="Registration Number">
               </div>
               <div class="form-group">
-                <input type="text" class="form-control" id="address" name="address" value="<%= company.Address || '' %>">
+                <input type="text" class="form-control" id="address" name="address" value="<%= isNew ? '' : (company.Address || '') %>" placeholder="Address">
               </div>
               <div class="form-group">
-                <input type="text" class="form-control" id="phone" name="phone" value="<%= company.Phone || '' %>">
+                <input type="text" class="form-control" id="phone" name="phone" value="<%= isNew ? '' : (company.Phone || '') %>" placeholder="Phone">
               </div>
               <div class="form-group">
-                <input type="email" class="form-control" id="email" name="email" value="<%= company.Email || '' %>">
+                <input type="email" class="form-control" id="email" name="email" value="<%= isNew ? '' : (company.Email || '') %>" placeholder="Email">
               </div>
-              <button type="submit" class="btn btn-primary btn-user">Update Company</button>
+              <button type="submit" class="btn btn-primary btn-user"><%= isNew ? 'Create Company' : 'Update Company' %></button>
+              <a href="/admin/companies" class="btn btn-secondary btn-user">Cancel</a>
             </form>
           </div>
         </div>

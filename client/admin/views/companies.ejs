@@ -1,38 +1,13 @@
 <%- include('partials/header', { title: title }) %>
 <div id="wrapper">
-  <%- include('partials/sidebar', { currentPage: currentPage }) %>
+  <%
+
+- include('partials/sidebar', { currentPage: currentPage }) %>
   <div id="content-wrapper" class="d-flex flex-column">
     <div id="content">
       <%- include('partials/topbar', { user: user }) %>
       <div class="container-fluid">
         <h1 class="h3 mb-4 text-gray-800">Companies</h1>
-
-        <!-- Create Company Form -->
-        <div class="card shadow mb-4">
-          <div class="card-header py-3">
-            <h6 class="m-0 font-weight-bold text-primary">Add New Company</h6>
-          </div>
-          <div class="card-body">
-            <form id="createCompanyForm" class="user">
-              <div class="form-group">
-                <input type="text" class="form-control" id="name" name="name" placeholder="Company Name" required>
-              </div>
-              <div class="form-group">
-                <input type="text" class="form-control" id="registrationNumber" name="registrationNumber" placeholder="Registration Number">
-              </div>
-              <div class="form-group">
-                <input type="text" class="form-control" id="address" name="address" placeholder="Address">
-              </div>
-              <div class="form-group">
-                <input type="text" class="form-control" id="phone" name="phone" placeholder="Phone">
-              </div>
-              <div class="form-group">
-                <input type="email" class="form-control" id="email" name="email" placeholder="Email">
-              </div>
-              <button type="submit" class="btn btn-primary btn-user">Create Company</button>
-            </form>
-          </div>
-        </div>
 
         <!-- Companies Table -->
         <div class="card shadow mb-4">
@@ -57,6 +32,13 @@
                 </tbody>
               </table>
             </div>
+            <!-- Add Company Button -->
+            <a href="/admin/companies/edit/new" class="btn btn-primary btn-icon-split">
+              <span class="icon text-white-50">
+                <i class="fas fa-plus"></i>
+              </span>
+              <span class="text">Add Company</span>
+            </a>
           </div>
         </div>
       </div>
@@ -67,88 +49,73 @@
 <%- include('partials/scripts') %>
 
 <script>
-  
   $(document).ready(function() {
+    console.log('Is Admin:', <%= isAdmin %>);
+
     // Fetch and display companies
     function loadCompanies() {
       let url = '/api/companies';
       let data = {};
-      if (!<%= isAdmin %>) { // If not admin, filter by selectedCompanyID
+      if (!<%= isAdmin %>) {
         data.companyId = '<%= selectedCompanyID %>';
         console.log('Filtering by companyId:', '<%= selectedCompanyID %>');
+      } else {
+        console.log('Fetching all companies as admin');
       }
       $.get(url, data, function(data) {
+        console.log('Received data:', data);
         let tbody = $('#companiesTableBody');
         tbody.empty();
-        data.forEach(company => {
-          let row = `
-            <tr>
-              <td>${company.Name}</td>
-              <td>${company.CompanyRegistrationNumber || ''}</td>
-              <td>${company.Address || ''}</td>
-              <td>${company.Phone || ''}</td>
-              <td>${company.Email || ''}</td>
-              <td>
-                <a href="/admin/companies/edit/${company._id}" class="btn btn-warning btn-sm">Edit</a>
-                <button class="btn btn-danger btn-sm delete-btn" data-id="${company._id}">Delete</button>
-              </td>
-            </tr>
-          `;
-          tbody.append(row);
-        });
+        if (data.length > 0) {
+          data.forEach(company => {
+            let row = `
+              <tr>
+                <td>${company.Name}</td>
+                <td>${company.CompanyRegistrationNumber || ''}</td>
+                <td>${company.Address || ''}</td>
+                <td>${company.Phone || ''}</td>
+                <td>${company.Email || ''}</td>
+                <td>
+                  <a href="/admin/companies/edit/${company._id}" class="btn btn-warning btn-sm">Edit</a>
+                  <button class="btn btn-danger btn-sm delete-btn" data-id="${company._id}">Delete</button>
+                </td>
+              </tr>
+            `;
+            tbody.append(row);
+          });
+        } else {
+          tbody.append('<tr><td colspan="6">No companies found</td></tr>');
+        }
       }).fail(function(xhr) {
         console.error('Error loading companies:', xhr.responseText);
+        $('#companiesTableBody').html('<tr><td colspan="6">Error loading companies</td></tr>');
       });
     }
 
-    // Create company
-    $('#createCompanyForm').on('submit', function(e) {
-      e.preventDefault();
-      console.log('Form submitted!');
-      let companyData = {
-        Name: $('#name').val(),
-        CompanyRegistrationNumber: $('#registrationNumber').val(),
-        Address: $('#address').val(),
-        Phone: $('#phone').val(),
-        Email: $('#email').val()
-      };
-      console.log('Sending company data:', companyData);
-      $.ajax({
-        url: '/api/companies',
-        method: 'POST',
-        contentType: 'application/json',
-        data: JSON.stringify(companyData),
-        success: function(response) {
-          console.log('Success:', response);
-          loadCompanies();
-          $('#createCompanyForm')[0].reset();
-        },
-        error: function(xhr) {
-          console.error('Error creating company:', xhr.responseText);
-          alert('Error creating company: ' + xhr.responseText);
-        }
-      });
-    });
-
-// Delete company
-$(document).on('click', '.delete-btn', function() {
-  if (confirm('Are you sure you want to delete this company?')) {
-    let id = $(this).data('id');
-    console.log('Attempting to delete company with ID:', id); // Debug log
-    $.ajax({
-      url: '/api/companies/' + id,
-      method: 'DELETE',
-      success: function() {
-        console.log('Company deleted successfully'); // Debug log
-        loadCompanies();
-      },
-      error: function(xhr) {
-        console.error('Error deleting company:', xhr.responseText); // Debug log
-        alert('Error deleting company: ' + xhr.responseText);
+    // Delete company
+    $(document).on('click', '.delete-btn', function() {
+      if (confirm('Are you sure you want to delete this company?')) {
+        let id = $(this).data('id');
+        console.log('Attempting to delete company with ID:', id);
+        $.ajax({
+          url: '/api/companies/' + id,
+          method: 'DELETE',
+          success: function() {
+            console.log('Company deleted successfully');
+            loadCompanies();
+          },
+          error: function(xhr) {
+            console.error('Error deleting company:', xhr.responseText);
+            if (xhr.status === 404) {
+              alert('This company has already been deleted. Refreshing the list...');
+              loadCompanies();
+            } else {
+              alert('Error deleting company: ' + xhr.responseText);
+            }
+          }
+        });
       }
     });
-  }
-});
 
     // Initial load
     loadCompanies();

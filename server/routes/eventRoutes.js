@@ -7,6 +7,10 @@ const EnvironmentObject = require('../models/EnvironmentObject');
 const EventType = require('../models/EventType');
 const Event = require('../models/Event');
 const Notification = require('../models/Notification');
+const mongoose = require('mongoose');
+
+
+
 
 // Middleware to check session and company
 const checkAuth = (req, res, next) => {
@@ -149,14 +153,14 @@ router.delete('/users/:id', checkAuth, async (req, res) => {
 });
 
 // Category Routes
-router.get('/categories', checkAuth, checkCompany, async (req, res) => {
-  try {
-    const categories = await Category.find({ CompanyID: req.session.selectedCompanyID });
-    res.json(categories);
-  } catch (error) {
-    res.status(500).json({ error: `Category list error: ${error.message}` });
-  }
-});
+// router.get('/categories', checkAuth, checkCompany, async (req, res) => {
+//   try {
+//     const categories = await Category.find({ CompanyID: req.session.selectedCompanyID });
+//     res.json(categories);
+//   } catch (error) {
+//     res.status(500).json({ error: `Category list error: ${error.message}` });
+//   }
+// });
 
 router.post('/categories', checkAuth, checkCompany, async (req, res) => {
   try {
@@ -168,15 +172,7 @@ router.post('/categories', checkAuth, checkCompany, async (req, res) => {
   }
 });
 
-router.get('/categories/:id', checkAuth, checkCompany, async (req, res) => {
-  try {
-    const category = await Category.findOne({ _id: req.params.id, CompanyID: req.session.selectedCompanyID });
-    if (!category) return res.status(404).json({ error: 'Category not found!' });
-    res.json(category);
-  } catch (error) {
-    res.status(500).json({ error: `Category fetch error: ${error.message}` });
-  }
-});
+
 
 router.put('/categories/:id', checkAuth, checkCompany, async (req, res) => {
   try {
@@ -192,13 +188,40 @@ router.put('/categories/:id', checkAuth, checkCompany, async (req, res) => {
   }
 });
 
-router.delete('/categories/:id', checkAuth, checkCompany, async (req, res) => {
+// Category routes
+router.get('/categories', async (req, res) => {
+  console.log('GET /api/categories received:', req.query);
   try {
-    const category = await Category.findOneAndDelete({ _id: req.params.id, CompanyID: req.session.selectedCompanyID });
-    if (!category) return res.status(404).json({ error: 'Category not found to delete!' });
-    res.json({ message: 'Category deleted, you rascal!' });
+    let query = {};
+    if (req.query.companyId) {
+      // Validate companyId as a valid ObjectId
+      if (!mongoose.Types.ObjectId.isValid(req.query.companyId)) {
+        return res.status(400).json({ error: 'Invalid companyId format' });
+      }
+      query.CompanyID = req.query.companyId;
+    }
+    const categories = await Category.find(query).lean(); // Use lean() for better performance
+    console.log('Found categories:', categories);
+    res.json(categories);
   } catch (error) {
-    res.status(500).json({ error: `Delete error: ${error.message}` });
+    console.error('Error fetching categories:', error);
+    res.status(500).send('Error fetching categories');
+  }
+});
+
+router.delete('/categories/:id', async (req, res) => {
+  console.log('DELETE /api/categories/:id received with ID:', req.params.id);
+  try {
+    const category = await Category.findByIdAndDelete(req.params.id);
+    if (!category) {
+      console.log('Category not found for ID:', req.params.id);
+      return res.status(404).json({ error: 'Category gone missing!' });
+    }
+    console.log('Category deleted:', category);
+    res.status(200).json({ message: 'Category deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting category:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 

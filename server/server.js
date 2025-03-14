@@ -6,6 +6,7 @@ const session = require('express-session');
 const eventRoutes = require('./routes/eventRoutes');
 const Company = require('./models/Company');
 const User = require('./models/User');
+const Category = require('./models/Category'); // Add this line
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -44,11 +45,10 @@ app.post('/admin/login', async (req, res) => {
   console.log('Login attempt:', { email, password });
   try {
     const user = await User.findOne({ Email: { $regex: new RegExp(`^${email}$`, 'i') } });
-    console.log('User found:', user);
     if (user && user.Password === password) {
-      console.log('Password match! Logging in...');
       req.session.user = user;
       req.session.selectedCompanyID = user.DefaultCompanyID || user.Companies[0] || null; // Ensure it's set, default to null if undefined
+      isAdmin: req.session.user.IsAdmin
       return res.redirect('/admin');
     }
     res.render('login', { title: 'Login - SB Admin', error: 'Invalid email or password' });
@@ -98,14 +98,74 @@ app.get('/admin/users', (req, res) => {
   });
 });
 
-app.get('/admin/categories', (req, res) => {
+app.get('/admin/categories', async (req, res) => {
   if (!req.session.user) return res.redirect('/admin/login');
   res.render('categories', {
     title: 'Categories - SB Admin',
     user: req.session.user,
     currentPage: 'categories',
-    selectedCompanyID: req.session.selectedCompanyID
+    selectedCompanyID: req.session.selectedCompanyID,
+    isAdmin: req.session.user.IsAdmin // Pass isAdmin based on the user
   });
+});
+
+// Add/Edit Category Routes
+app.get('/admin/categories/edit/:id', async (req, res) => {
+  if (!req.session.user) return res.redirect('/admin/login');
+  if (req.params.id === 'new') {
+    res.render('category-edit', {
+      title: 'Add Category - SB Admin',
+      user: req.session.user,
+      category: {},
+      currentPage: 'categories',
+      selectedCompanyID: req.session.selectedCompanyID,
+      isAdmin: req.session.user.IsAdmin,
+      isNew: true
+    });
+  } else {
+    const category = await Category.findById(req.params.id);
+    if (!category) return res.status(404).send('Category not found');
+    res.render('category-edit', {
+      title: 'Edit Category - SB Admin',
+      user: req.session.user,
+      category: category,
+      currentPage: 'categories',
+      selectedCompanyID: req.session.selectedCompanyID,
+      isAdmin: req.session.user.IsAdmin,
+      isNew: false
+    });
+  }
+});
+
+app.post('/admin/categories/edit/:id', async (req, res) => {
+  const { name, description, companyId } = req.body;
+  try {
+    const updateData = {
+      Name: name,
+      Description: description,
+      CompanyID: companyId || req.session.selectedCompanyID
+    };
+    const category = await Category.findByIdAndUpdate(req.params.id, updateData, { new: true });
+    if (!category) return res.status(404).send('Category not found');
+    res.redirect('/admin/categories');
+  } catch (error) {
+    res.status(500).send('Error updating category: ' + error.message);
+  }
+});
+
+app.post('/admin/categories/add', async (req, res) => {
+  const { name, description, companyId } = req.body;
+  try {
+    const category = new Category({
+      Name: name,
+      Description: description,
+      CompanyID: companyId || req.session.selectedCompanyID
+    });
+    await category.save();
+    res.redirect('/admin/categories');
+  } catch (error) {
+    res.status(500).send('Error creating category: ' + error.message);
+  }
 });
 
 app.get('/admin/environment-objects', (req, res) => {

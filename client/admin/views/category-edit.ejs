@@ -1,0 +1,32 @@
+<%- include('partials/header', { title: title }) %>
+<div id="wrapper">
+  <%- include('partials/sidebar', { currentPage: currentPage }) %>
+  <div id="content-wrapper" class="d-flex flex-column">
+    <div id="content">
+      <%- include('partials/topbar', { user: user }) %>
+      <div class="container-fluid">
+        <h1 class="h3 mb-4 text-gray-800"><%= isNew ? 'Add Category' : 'Edit Category' %></h1>
+        <div class="card shadow mb-4">
+          <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary"><%= isNew ? 'Add Category Details' : 'Edit Category Details' %></h6>
+          </div>
+          <div class="card-body">
+            <form method="POST" action="<%= isNew ? '/admin/categories/add' : '/admin/categories/edit/' + category._id %>" class="user">
+              <input type="hidden" name="companyId" value="<%= selectedCompanyID %>">
+              <div class="form-group">
+                <input type="text" class="form-control" id="name" name="name" value="<%= isNew ? '' : category.Name %>" placeholder="Category Name" required>
+              </div>
+              <div class="form-group">
+                <textarea class="form-control" id="description" name="description" placeholder="Description"><%= isNew ? '' : (category.Description || '') %></textarea>
+              </div>
+              <button type="submit" class="btn btn-primary btn-user"><%= isNew ? 'Create Category' : 'Update Category' %></button>
+              <a href="/admin/categories" class="btn btn-secondary btn-user">Cancel</a>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+    <%- include('partials/footer') %>
+  </div>
+</div>
+<%- include('partials/scripts') %>

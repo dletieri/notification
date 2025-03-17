@@ -78,17 +78,22 @@ app.get('/admin', async (req, res) => {
 });
 
 app.get('/admin/login', (req, res) => {
+  console.log('Rendering login page, error:', null);
+  console.log('Session on login GET:', req.session);
   res.render('login', { title: 'Login - SB Admin', error: null });
 });
 
 app.post('/admin/login', async (req, res) => {
   const { email, password } = req.body;
+  console.log('Login attempt:', { email, password });
   const user = await User.findOne({ Email: email });
   if (user && user.Password === password) {
     req.session.user = user;
     req.session.selectedCompanyID = user.DefaultCompanyID;
+    console.log('Login successful, redirecting to /admin');
     res.redirect('/admin');
   } else {
+    console.log('Login failed, error:', 'Invalid email or password');
     res.render('login', { title: 'Login - SB Admin', error: 'Invalid email or password' });
   }
 });

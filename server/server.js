@@ -29,7 +29,11 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, '../client/admin/views'));
-app.use(express.static(path.join(__dirname, '../client/admin/public')));
+app.use(express.static(path.join(__dirname, '../client/admin')));
+
+const staticPath = path.join(__dirname, '../client/admin');
+console.log('Serving static files from:', staticPath);
+app.use(express.static(staticPath));
 
 // Session setup
 const store = new MongoDBStore({

@@ -1,0 +1,45 @@
+<%- include('partials/header', { title: title }) %>
+<div id="wrapper">
+  <%- include('partials/sidebar', { currentPage: currentPage }) %>
+  <div id="content-wrapper" class="d-flex flex-column">
+    <div id="content">
+      <%- include('partials/topbar', { user: user, selectedCompany: selectedCompany }) %>
+      <div class="container-fluid">
+        <h1 class="h3 mb-4 text-gray-800"><%= isNew ? 'Add Event Type' : 'Edit Event Type' %></h1>
+        <div class="card shadow mb-4">
+          <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary"><%= isNew ? 'Add Event Type Details' : 'Edit Event Type Details' %></h6>
+          </div>
+          <div class="card-body">
+            <form method="POST" action="<%= isNew ? '/admin/event-types/add' : '/admin/event-types/edit/' + eventType._id %>" class="user">
+              <input type="hidden" name="companyId" value="<%= selectedCompanyID %>">
+              <div class="form-group">
+                <label for="name">Name</label>
+                <input type="text" class="form-control" id="name" name="name" value="<%= isNew ? '' : eventType.Name %>" placeholder="Event Type Name" required>
+              </div>
+              <div class="form-group">
+                <label for="description">Description</label>
+                <textarea class="form-control" id="description" name="description" placeholder="Description"><%= isNew ? '' : (eventType.Description || '') %></textarea>
+              </div>
+              <div class="form-group">
+                <label for="categoryId">Category</label>
+                <select class="form-control" id="categoryId" name="categoryId" required>
+                  <option value="">Select a Category</option>
+                  <% categories.forEach(category => { %>
+                    <option value="<%= category._id %>" <%= !isNew && eventType.CategoryID && category._id.toString() === eventType.CategoryID.toString() ? 'selected' : '' %>>
+                      <%= category.Name %>
+                    </option>
+                  <% }); %>
+                </select>
+              </div>
+              <button type="submit" class="btn btn-primary btn-user"><%= isNew ? 'Create Event Type' : 'Update Event Type' %></button>
+              <a href="/admin/event-types" class="btn btn-secondary btn-user">Cancel</a>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+    <%- include('partials/footer') %>
+  </div>
+</div>
+<%- include('partials/scripts') %>

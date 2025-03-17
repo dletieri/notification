@@ -327,14 +327,14 @@ router.delete('/environment-objects/:id', checkAuth, checkCompany, async (req, r
 });
 
 // EventType Routes
-router.get('/event-types', checkAuth, checkCompany, async (req, res) => {
-  try {
-    const eventTypes = await EventType.find({ CompanyID: req.session.selectedCompanyID });
-    res.json(eventTypes);
-  } catch (error) {
-    res.status(500).json({ error: `Event type list error: ${error.message}` });
-  }
-});
+// router.get('/event-types', checkAuth, checkCompany, async (req, res) => {
+//   try {
+//     const eventTypes = await EventType.find({ CompanyID: req.session.selectedCompanyID });
+//     res.json(eventTypes);
+//   } catch (error) {
+//     res.status(500).json({ error: `Event type list error: ${error.message}` });
+//   }
+// });
 
 router.post('/event-types', checkAuth, checkCompany, async (req, res) => {
   try {
@@ -485,6 +485,53 @@ router.delete('/notifications/:id', checkAuth, checkCompany, async (req, res) =>
     res.json({ message: 'Notification deleted, you cheeky flirt!' });
   } catch (error) {
     res.status(500).json({ error: `Delete error: ${error.message}` });
+  }
+});
+
+// Event Type routes
+router.get('/event-types', async (req, res) => {
+  console.log('GET /api/event-types received:', req.query);
+  try {
+    let query = {};
+    if (req.query.companyId) {
+      if (!mongoose.Types.ObjectId.isValid(req.query.companyId)) {
+        return res.status(400).json({ error: 'Invalid companyId format' });
+      }
+      query.CompanyID = req.query.companyId;
+    }
+    const eventTypes = await EventType.find(query)
+      .populate('CompanyID', 'Name')
+      .populate('CategoryID', 'Name')
+      .lean();
+
+    // Add CompanyName and CategoryName to each object for easier display
+    const result = eventTypes.map(type => ({
+      ...type,
+      CompanyName: type.CompanyID ? type.CompanyID.Name : 'N/A',
+      CategoryName: type.CategoryID ? type.CategoryID.Name : 'N/A'
+    }));
+
+    console.log('Found event types:', result);
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching event types:', error);
+    res.status(500).send('Error fetching event types');
+  }
+});
+
+router.delete('/event-types/:id', async (req, res) => {
+  console.log('DELETE /api/event-types/:id received with ID:', req.params.id);
+  try {
+    const eventType = await EventType.findByIdAndDelete(req.params.id);
+    if (!eventType) {
+      console.log('Event type not found for ID:', req.params.id);
+      return res.status(404).json({ error: 'Event type not found' });
+    }
+    console.log('Event type deleted:', eventType);
+    res.status(200).json({ message: 'Event type deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting event type:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 

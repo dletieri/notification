@@ -271,6 +271,193 @@ app.get('/admin/environment-objects', async (req, res) => {
   });
 });
 
+app.get('/admin/environment-objects/edit/:id', async (req, res) => {
+  if (!req.session.user) return res.redirect('/admin/login');
+
+  // Populate user.Companies with full company objects
+  const user = await User.findById(req.session.user._id).populate('Companies').lean();
+  if (!user) return res.redirect('/admin/login');
+
+  // Fetch the selected company
+  let selectedCompany = null;
+  if (req.session.selectedCompanyID) {
+    selectedCompany = await Company.findById(req.session.selectedCompanyID).lean();
+  }
+
+  // Fetch categories for the dropdown
+  let categories = [];
+  if (req.session.selectedCompanyID) {
+    categories = await Category.find({ CompanyID: req.session.selectedCompanyID }).lean();
+  }
+
+  if (req.params.id === 'new') {
+    res.render('environment-object-edit', {
+      title: 'Add Environment Object - SB Admin',
+      user: user,
+      environmentObject: {},
+      categories: categories,
+      currentPage: 'environment-objects',
+      selectedCompanyID: req.session.selectedCompanyID || null,
+      isAdmin: user.IsAdmin,
+      isNew: true,
+      selectedCompany: selectedCompany
+    });
+  } else {
+    const environmentObject = await EnvironmentObject.findById(req.params.id).lean();
+    if (!environmentObject) return res.status(404).send('Environment object not found');
+    res.render('environment-object-edit', {
+      title: 'Edit Environment Object - SB Admin',
+      user: user,
+      environmentObject: environmentObject,
+      categories: categories,
+      currentPage: 'environment-objects',
+      selectedCompanyID: req.session.selectedCompanyID || null,
+      isAdmin: user.IsAdmin,
+      isNew: false,
+      selectedCompany: selectedCompany
+    });
+  }
+});
+
+app.post('/admin/environment-objects/edit/:id', async (req, res) => {
+  const { name, description, companyId, categoryId } = req.body;
+  try {
+    const updateData = {
+      Name: name,
+      Description: description,
+      CompanyID: companyId || req.session.selectedCompanyID,
+      CategoryID: categoryId
+    };
+    const environmentObject = await EnvironmentObject.findByIdAndUpdate(req.params.id, updateData, { new: true });
+    if (!environmentObject) return res.status(404).send('Environment object not found');
+    res.redirect('/admin/environment-objects');
+  } catch (error) {
+    res.status(500).send('Error updating environment object: ' + error.message);
+  }
+});
+
+app.post('/admin/environment-objects/add', async (req, res) => {
+  const { name, description, companyId, categoryId } = req.body;
+  try {
+    const environmentObject = new EnvironmentObject({
+      Name: name,
+      Description: description,
+      CompanyID: companyId || req.session.selectedCompanyID,
+      CategoryID: categoryId
+    });
+    await environmentObject.save();
+    res.redirect('/admin/environment-objects');
+  } catch (error) {
+    res.status(500).send('Error creating environment object: ' + error.message);
+  }
+});
+
+app.get('/admin/event-types', async (req, res) => {
+  if (!req.session.user) return res.redirect('/admin/login');
+
+  // Populate user.Companies with full company objects
+  const user = await User.findById(req.session.user._id).populate('Companies').lean();
+  if (!user) return res.redirect('/admin/login');
+
+  // Fetch the selected company
+  let selectedCompany = null;
+  if (req.session.selectedCompanyID) {
+    selectedCompany = await Company.findById(req.session.selectedCompanyID).lean();
+  }
+
+  res.render('event-types', {
+    title: 'Event Types - SB Admin',
+    user: user,
+    currentPage: 'event-types',
+    selectedCompanyID: req.session.selectedCompanyID || null,
+    isAdmin: user.IsAdmin,
+    selectedCompany: selectedCompany
+  });
+});
+
+app.get('/admin/event-types/edit/:id', async (req, res) => {
+  if (!req.session.user) return res.redirect('/admin/login');
+
+  // Populate user.Companies with full company objects
+  const user = await User.findById(req.session.user._id).populate('Companies').lean();
+  if (!user) return res.redirect('/admin/login');
+
+  // Fetch the selected company
+  let selectedCompany = null;
+  if (req.session.selectedCompanyID) {
+    selectedCompany = await Company.findById(req.session.selectedCompanyID).lean();
+  }
+
+  // Fetch categories for the dropdown (filtered by selected company)
+  let categories = [];
+  if (req.session.selectedCompanyID) {
+    categories = await Category.find({ CompanyID: req.session.selectedCompanyID }).lean();
+  }
+
+  if (req.params.id === 'new') {
+    res.render('event-type-edit', {
+      title: 'Add Event Type - SB Admin',
+      user: user,
+      eventType: {},
+      categories: categories,
+      currentPage: 'event-types',
+      selectedCompanyID: req.session.selectedCompanyID || null,
+      isAdmin: user.IsAdmin,
+      isNew: true,
+      selectedCompany: selectedCompany
+    });
+  } else {
+    const eventType = await EventType.findById(req.params.id).lean();
+    if (!eventType) return res.status(404).send('Event Type not found');
+    res.render('event-type-edit', {
+      title: 'Edit Event Type - SB Admin',
+      user: user,
+      eventType: eventType,
+      categories: categories,
+      currentPage: 'event-types',
+      selectedCompanyID: req.session.selectedCompanyID || null,
+      isAdmin: user.IsAdmin,
+      isNew: false,
+      selectedCompany: selectedCompany
+    });
+  }
+});
+
+app.post('/admin/event-types/edit/:id', async (req, res) => {
+  const { name, description, companyId, categoryId } = req.body;
+  try {
+    const updateData = {
+      Name: name,
+      Description: description,
+      CompanyID: companyId || req.session.selectedCompanyID,
+      CategoryID: categoryId
+    };
+    const eventType = await EventType.findByIdAndUpdate(req.params.id, updateData, { new: true });
+    if (!eventType) return res.status(404).send('Event Type not found');
+    res.redirect('/admin/event-types');
+  } catch (error) {
+    res.status(500).send('Error updating event type: ' + error.message);
+  }
+});
+
+app.post('/admin/event-types/add', async (req, res) => {
+  const { name, description, companyId, categoryId } = req.body;
+  try {
+    const eventType = new EventType({
+      Name: name,
+      Description: description,
+      CompanyID: companyId || req.session.selectedCompanyID,
+      CategoryID: categoryId
+    });
+    await eventType.save();
+    res.redirect('/admin/event-types');
+  } catch (error) {
+    res.status(500).send('Error creating event type: ' + error.message);
+  }
+});
+
+
+
 app.use('/api', eventRoutes);
 
 // Start server

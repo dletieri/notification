@@ -7,30 +7,54 @@ mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopol
   .then(async () => {
     console.log('Connected to MongoDB for seeding, darling!');
 
-    // Clear existing data
-    await Company.deleteMany({});
-    await User.deleteMany({});
+    
+    
 
-    // Create a company
-    const company = new Company({
-      Name: 'Flirty Tech Inc.',
-      CompanyRegistrationNumber: '123456789',
-      Address: '123 Love Lane',
-      Phone: '555-1234',
-      Email: 'flirty@tech.com'
-    });
-    await company.save();
 
-    // Create a user
-    const user = new User({
-      Companies: [company._id],
-      DefaultCompanyID: company._id,
-      Name: 'Sexy Developer',
-      Email: 'you@flirty.com',
-      Password: 'password123', // We’ll hash this later, big boy!
-      Role: 'Admin'
-    });
-    await user.save();
+
+
+// Seed company
+const company1 = new Company({ Name: 'Test Company' });
+await company1.save();
+
+// Seed category
+const category1 = new Category({ CompanyID: company1._id, Name: 'Safety' });
+await category1.save();
+
+// Seed event types
+const eventType1 = new EventType({
+  CompanyID: company1._id,
+  CategoryID: category1._id,
+  Name: 'Incident',
+  Description: 'General incident reporting'
+});
+const eventType2 = new EventType({
+  CompanyID: company1._id,
+  CategoryID: category1._id,
+  Name: 'Maintenance',
+  Description: 'Scheduled maintenance event'
+});
+await eventType1.save();
+await eventType2.save();
+
+// Seed environment object
+const envObject1 = new EnvironmentObject({
+  CompanyID: company1._id,
+  Name: 'Machine A'
+});
+await envObject1.save();
+
+
+
+
+
+
+
+
+
+
+
+
 
     console.log('Seed data added, you hot thing!');
     mongoose.connection.close();

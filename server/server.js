@@ -50,9 +50,99 @@ app.use(session({
 }));
 
 // Routes
-app.get('/', (req, res) => {
-  res.redirect('/admin');
+// GET / - Render the event report page
+app.get('/', async (req, res) => {
+  const objID = req.query.objID;
+
+  // Validate objID format
+  if (!objID || !mongoose.Types.ObjectId.isValid(objID)) {
+    return res.status(400).send('Invalid or missing objID');
+  }
+
+  try {
+    // Fetch the EnvironmentObject with populated Company
+    const environmentObject = await EnvironmentObject.findById(objID)
+      .populate('CompanyID', 'Name')
+      .lean();
+    if (!environmentObject) {
+      return res.status(404).send('Environment Object not found');
+    }
+
+    // Fetch EventTypes for the company
+    const eventTypes = await EventType.find({ CompanyID: environmentObject.CompanyID._id })
+      .populate('CategoryID', 'Name')
+      .lean();
+
+    // If no event types found, show an error
+    if (!eventTypes || eventTypes.length === 0) {
+      return res.status(400).send('No event types available for this company');
+    }
+
+    res.render('report-event', {
+      title: 'Report Event',
+      environmentObject,
+      eventTypes,
+      selectedCompanyID: null,
+      isAdmin: false
+    });
+  } catch (error) {
+    console.error('Error loading event report page:', error);
+    res.status(500).send('Error loading event report page');
+  }
 });
+
+// POST /report-event - Handle event submission
+app.post('/report-event', async (req, res) => {
+  const { objID, eventTypeID } = req.body;
+
+  // Validate required fields
+  if (!objID || !eventTypeID || !mongoose.Types.ObjectId.isValid(objID) || !mongoose.Types.ObjectId.isValid(eventTypeID)) {
+    return res.status(400).send('Invalid or missing required fields');
+  }
+
+  try {
+    // Fetch the EnvironmentObject to get CompanyID
+    const environmentObject = await EnvironmentObject.findById(objID).lean();
+    if (!environmentObject) {
+      return res.status(404).send('Environment Object not found');
+    }
+
+    // Fetch the EventType to get CategoryID
+    const eventType = await EventType.findById(eventTypeID).lean();
+    if (!eventType) {
+      return res.status(404).send('Event Type not found');
+    }
+
+    // Create the new Event (no UserID or Details for now)
+    const newEvent = new Event({
+      CompanyID: environmentObject.CompanyID,
+      CategoryID: eventType.CategoryID,
+      EventTypeID: new mongoose.Types.ObjectId(eventTypeID),
+      EnvironmentObjectID: new mongoose.Types.ObjectId(objID),
+      Date: new Date()
+      // UserID and Details are omitted as requested
+    });
+
+    await newEvent.save();
+    res.redirect('/thanks?objID=' + objID); // Redirect to thank you page with objID
+  } catch (error) {
+    console.error('Error submitting event:', error);
+    res.status(500).send('Error submitting event: ' + error.message);
+  }
+});
+
+// GET /thanks - Render the thank you page
+app.get('/thanks', (req, res) => {
+  const objID = req.query.objID;
+  if (!objID || !mongoose.Types.ObjectId.isValid(objID)) {
+    return res.status(400).send('Invalid or missing objID');
+  }
+  res.render('thanks', {
+    title: 'Thank You',
+    query: { objID: objID }
+  });
+});
+
 
 app.get('/admin', async (req, res) => {
   if (!req.session.user) return res.redirect('/admin/login');

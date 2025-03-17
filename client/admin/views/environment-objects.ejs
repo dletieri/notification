@@ -1,17 +1,119 @@
 <%- include('partials/header', { title: title }) %>
 <div id="wrapper">
-  <%- include('partials/sidebar') %>
+  <%- include('partials/sidebar', { currentPage: currentPage }) %>
   <div id="content-wrapper" class="d-flex flex-column">
     <div id="content">
-      <%- include('partials/topbar', { user: user }) %>
+      <%- include('partials/topbar', { user: user, selectedCompany: selectedCompany }) %>
       <div class="container-fluid">
-        <h1 class="h3 mb-4 text-gray-800">Objects/Environments</h1>
-        <p>Users management page (to be implemented).</p>
+        <h1 class="h3 mb-4 text-gray-800">Environment Objects</h1>
+
+        <!-- Environment Objects Table -->
+        <div class="card shadow mb-4">
+          <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Environment Object List</h6>
+          </div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-bordered" id="environmentObjectsTable" width="100%" cellspacing="0">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Description</th>
+                    <th>Company</th>
+                    <th>Category</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="environmentObjectsTableBody">
+                  <!-- Data will be populated here via AJAX -->
+                </tbody>
+              </table>
+            </div>
+            <!-- Add Environment Object Button -->
+            <a href="/admin/environment-objects/edit/new" class="btn btn-primary btn-icon-split">
+              <span class="icon text-white-50">
+                <i class="fas fa-plus"></i>
+              </span>
+              <span class="text">Add Environment Object</span>
+            </a>
+          </div>
+        </div>
       </div>
     </div>
     <%- include('partials/footer') %>
   </div>
 </div>
 <%- include('partials/scripts') %>
-</body>
-</html>
+
+<script>
+  $(document).ready(function() {
+    console.log('Is Admin:', <%= isAdmin %>);
+
+    // Fetch and display environment objects
+    function loadEnvironmentObjects() {
+      let url = '/api/environment-objects';
+      let data = {};
+      if (!<%= isAdmin %>) {
+        data.companyId = '<%= selectedCompanyID %>';
+        console.log('Filtering by companyId:', '<%= selectedCompanyID %>');
+      } else {
+        console.log('Fetching all environment objects as admin');
+      }
+      $.get(url, data, function(response) {
+        console.log('Received response:', response);
+        let tbody = $('#environmentObjectsTableBody');
+        tbody.empty();
+        if (Array.isArray(response) && response.length > 0) {
+          response.forEach(obj => {
+            let row = `
+              <tr>
+                <td>${obj.Name || 'N/A'}</td>
+                <td>${obj.Description || ''}</td>
+                <td>${obj.CompanyName || 'N/A'}</td>
+                <td>${obj.CategoryName || 'N/A'}</td>
+                <td>
+                  <a href="/admin/environment-objects/edit/${obj._id}" class="btn btn-warning btn-sm">Edit</a>
+                  <button class="btn btn-danger btn-sm delete-btn" data-id="${obj._id}">Delete</button>
+                </td>
+              </tr>
+            `;
+            tbody.append(row);
+          });
+        } else {
+          tbody.append('<tr><td colspan="5">No environment objects found</td></tr>');
+        }
+      }).fail(function(xhr) {
+        console.error('Error loading environment objects:', xhr.status, xhr.responseText);
+        $('#environmentObjectsTableBody').html('<tr><td colspan="5">Error loading environment objects: ' + (xhr.responseText || 'Unknown error') + '</td></tr>');
+      });
+    }
+
+    // Delete environment object
+    $(document).on('click', '.delete-btn', function() {
+      if (confirm('Are you sure you want to delete this environment object?')) {
+        let id = $(this).data('id');
+        console.log('Attempting to delete environment object with ID:', id);
+        $.ajax({
+          url: '/api/environment-objects/' + id,
+          method: 'DELETE',
+          success: function() {
+            console.log('Environment object deleted successfully');
+            loadEnvironmentObjects();
+          },
+          error: function(xhr) {
+            console.error('Error deleting environment object:', xhr.status, xhr.responseText);
+            if (xhr.status === 404) {
+              alert('This environment object has already been deleted. Refreshing the list...');
+              loadEnvironmentObjects();
+            } else {
+              alert('Error deleting environment object: ' + (xhr.responseText || 'Unknown error'));
+            }
+          }
+        });
+      }
+    });
+
+    // Initial load
+    loadEnvironmentObjects();
+  });
+</script>

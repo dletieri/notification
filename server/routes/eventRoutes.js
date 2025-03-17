@@ -225,6 +225,53 @@ router.delete('/categories/:id', async (req, res) => {
   }
 });
 
+// Environment Object routes
+router.get('/environment-objects', async (req, res) => {
+  console.log('GET /api/environment-objects received:', req.query);
+  try {
+    let query = {};
+    if (req.query.companyId) {
+      if (!mongoose.Types.ObjectId.isValid(req.query.companyId)) {
+        return res.status(400).json({ error: 'Invalid companyId format' });
+      }
+      query.CompanyID = req.query.companyId;
+    }
+    const environmentObjects = await EnvironmentObject.find(query)
+      .populate('CompanyID', 'Name') // Populate Company Name
+      .populate('CategoryID', 'Name') // Populate Category Name
+      .lean();
+    
+    // Add CompanyName and CategoryName to each object for easier display
+    const result = environmentObjects.map(obj => ({
+      ...obj,
+      CompanyName: obj.CompanyID ? obj.CompanyID.Name : 'N/A',
+      CategoryName: obj.CategoryID ? obj.CategoryID.Name : 'N/A'
+    }));
+    
+    console.log('Found environment objects:', result);
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching environment objects:', error);
+    res.status(500).send('Error fetching environment objects');
+  }
+});
+
+router.delete('/environment-objects/:id', async (req, res) => {
+  console.log('DELETE /api/environment-objects/:id received with ID:', req.params.id);
+  try {
+    const environmentObject = await EnvironmentObject.findByIdAndDelete(req.params.id);
+    if (!environmentObject) {
+      console.log('Environment object not found for ID:', req.params.id);
+      return res.status(404).json({ error: 'Environment object not found' });
+    }
+    console.log('Environment object deleted:', environmentObject);
+    res.status(200).json({ message: 'Environment object deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting environment object:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // EnvironmentObject Routes
 router.get('/environment-objects', checkAuth, checkCompany, async (req, res) => {
   try {

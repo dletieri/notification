@@ -1,138 +1,185 @@
-require('dotenv').config();
+require('dotenv').config(); // Add this line to load .env file
+
 const express = require('express');
 const mongoose = require('mongoose');
-const path = require('path');
 const session = require('express-session');
+const MongoDBStore = require('connect-mongodb-session')(session);
+const path = require('path');
 const eventRoutes = require('./routes/eventRoutes');
-const Company = require('./models/Company');
-const User = require('./models/User');
-const Category = require('./models/Category'); // Add this line
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 
-// Middleware
-app.use(express.json()); // For JSON requests
-app.use(express.urlencoded({ extended: true })); // For form submissions
-app.use(express.static(path.join(__dirname, '../client')));
-app.use('/admin', express.static(path.join(__dirname, '../client/admin')));
+// Import models
+const Company = require('./models/Company');
+const User = require('./models/User');
+const Category = require('./models/Category');
+const EnvironmentObject = require('./models/EnvironmentObject');
+const Event = require('./models/Event');
+const EventType = require('./models/EventType');
+const Notification = require('./models/Notification');
+const Submission = require('./models/Submission');
 
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'your-secret-key',
-  resave: false,
-  saveUninitialized: false,
-  cookie: { secure: false }
-}));
-
-app.set('view engine', 'ejs');
-app.set('views', path.join(__dirname, '../client/admin/views'));
-
-// MongoDB Connection
+// Connect to MongoDB
 mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => console.log('Connected to MongoDB'))
   .catch(err => console.error('MongoDB connection error:', err));
 
-// API Routes
-app.use('/api', eventRoutes);
+// Middleware
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, '../client/admin/views'));
+app.use(express.static(path.join(__dirname, '../client/admin/public')));
 
-// Main Routes
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, '../client/index.html')));
+// Session setup
+const store = new MongoDBStore({
+  uri: process.env.MONGO_URI,
+  collection: 'sessions'
+});
 
-app.get('/admin/login', (req, res) => res.render('login', { title: 'Login - SB Admin' }));
+app.use(session({
+  secret: 'your-secret-key',
+  resave: false,
+  saveUninitialized: false,
+  store: store,
+  cookie: { maxAge: 1000 * 60 * 60 } // 1 hour
+}));
 
-app.post('/admin/login', async (req, res) => {
-  const { email, password } = req.body;
-  console.log('Login attempt:', { email, password });
-  try {
-    const user = await User.findOne({ Email: { $regex: new RegExp(`^${email}$`, 'i') } });
-    if (user && user.Password === password) {
-      req.session.user = user;
-      req.session.selectedCompanyID = user.DefaultCompanyID || user.Companies[0] || null; // Ensure it's set, default to null if undefined
-      isAdmin: req.session.user.IsAdmin
-      return res.redirect('/admin');
-    }
-    res.render('login', { title: 'Login - SB Admin', error: 'Invalid email or password' });
-  } catch (error) {
-    console.error('Login error:', error);
-    res.render('login', { title: 'Login - SB Admin', error: 'An error occurred during login' });
+// Routes
+app.get('/', (req, res) => {
+  res.redirect('/admin');
+});
+
+app.get('/admin', async (req, res) => {
+  if (!req.session.user) return res.redirect('/admin/login');
+
+  // Populate user.Companies with full company objects
+  const user = await User.findById(req.session.user._id).populate('Companies').lean();
+  if (!user) return res.redirect('/admin/login');
+
+  // Fetch the selected company
+  let selectedCompany = null;
+  if (req.session.selectedCompanyID) {
+    selectedCompany = await Company.findById(req.session.selectedCompanyID).lean();
   }
-});
 
-app.get('/admin/select-company', (req, res) => {
-  if (!req.session.user) return res.redirect('/admin/login');
-  res.render('select-company', { title: 'Select Company - SB Admin', companies: req.session.user.Companies });
-});
-
-app.post('/admin/select-company', (req, res) => {
-  const { companyID } = req.body;
-  if (req.session.user.Companies.includes(companyID)) {
-    req.session.selectedCompanyID = companyID;
-    return res.redirect('/admin');
-  }
-  res.status(400).send('Invalid company');
-});
-
-app.get('/admin', (req, res) => {
-  if (!req.session.user) return res.redirect('/admin/login');
-  res.render('index', { title: 'Dashboard - SB Admin', user: req.session.user, currentPage: 'dashboard' });
-});
-
-app.get('/admin/companies', (req, res) => {
-  if (!req.session.user) return res.redirect('/admin/login');
-  res.render('companies', {
-    title: 'Companies - SB Admin',
-    user: req.session.user,
-    currentPage: 'companies',
-    selectedCompanyID: req.session.selectedCompanyID,
-    isAdmin: req.session.user.IsAdmin // Add this
+  res.render('index', {
+    title: 'Dashboard - SB Admin',
+    user: user,
+    currentPage: 'dashboard',
+    selectedCompanyID: req.session.selectedCompanyID || null,
+    isAdmin: user.IsAdmin,
+    selectedCompany: selectedCompany
   });
 });
 
-app.get('/admin/users', (req, res) => {
+app.get('/admin/login', (req, res) => {
+  res.render('login', { title: 'Login - SB Admin', error: null });
+});
+
+app.post('/admin/login', async (req, res) => {
+  const { email, password } = req.body;
+  const user = await User.findOne({ Email: email });
+  if (user && user.Password === password) {
+    req.session.user = user;
+    req.session.selectedCompanyID = user.DefaultCompanyID;
+    res.redirect('/admin');
+  } else {
+    res.render('login', { title: 'Login - SB Admin', error: 'Invalid email or password' });
+  }
+});
+
+app.get('/admin/logout', (req, res) => {
+  req.session.destroy(err => {
+    if (err) {
+      return res.status(500).send('Error logging out');
+    }
+    res.redirect('/admin/login');
+  });
+});
+
+app.get('/admin/companies', async (req, res) => {
   if (!req.session.user) return res.redirect('/admin/login');
-  res.render('users', {
-    title: 'Users - SB Admin',
-    user: req.session.user,
-    currentPage: 'users',
-    selectedCompanyID: req.session.selectedCompanyID
+
+  // Populate user.Companies with full company objects
+  const user = await User.findById(req.session.user._id).populate('Companies').lean();
+  if (!user) return res.redirect('/admin/login');
+
+  // Fetch the selected company
+  let selectedCompany = null;
+  if (req.session.selectedCompanyID) {
+    selectedCompany = await Company.findById(req.session.selectedCompanyID).lean();
+  }
+
+  res.render('companies', {
+    title: 'Companies - SB Admin',
+    user: user,
+    currentPage: 'companies',
+    selectedCompanyID: req.session.selectedCompanyID || null,
+    isAdmin: user.IsAdmin,
+    selectedCompany: selectedCompany
   });
 });
 
 app.get('/admin/categories', async (req, res) => {
   if (!req.session.user) return res.redirect('/admin/login');
+
+  // Populate user.Companies with full company objects
+  const user = await User.findById(req.session.user._id).populate('Companies').lean();
+  if (!user) return res.redirect('/admin/login');
+
+  // Fetch the selected company
+  let selectedCompany = null;
+  if (req.session.selectedCompanyID) {
+    selectedCompany = await Company.findById(req.session.selectedCompanyID).lean();
+  }
+
   res.render('categories', {
     title: 'Categories - SB Admin',
-    user: req.session.user,
+    user: user,
     currentPage: 'categories',
-    selectedCompanyID: req.session.selectedCompanyID,
-    isAdmin: req.session.user.IsAdmin // Pass isAdmin based on the user
+    selectedCompanyID: req.session.selectedCompanyID || null,
+    isAdmin: user.IsAdmin,
+    selectedCompany: selectedCompany
   });
 });
 
-// Add/Edit Category Routes
 app.get('/admin/categories/edit/:id', async (req, res) => {
   if (!req.session.user) return res.redirect('/admin/login');
+
+  // Populate user.Companies with full company objects
+  const user = await User.findById(req.session.user._id).populate('Companies').lean();
+  if (!user) return res.redirect('/admin/login');
+
+  // Fetch the selected company
+  let selectedCompany = null;
+  if (req.session.selectedCompanyID) {
+    selectedCompany = await Company.findById(req.session.selectedCompanyID).lean();
+  }
+
   if (req.params.id === 'new') {
     res.render('category-edit', {
       title: 'Add Category - SB Admin',
-      user: req.session.user,
+      user: user,
       category: {},
       currentPage: 'categories',
-      selectedCompanyID: req.session.selectedCompanyID,
-      isAdmin: req.session.user.IsAdmin,
-      isNew: true
+      selectedCompanyID: req.session.selectedCompanyID || null,
+      isAdmin: user.IsAdmin,
+      isNew: true,
+      selectedCompany: selectedCompany
     });
   } else {
-    const category = await Category.findById(req.params.id);
+    const category = await Category.findById(req.params.id).lean();
     if (!category) return res.status(404).send('Category not found');
     res.render('category-edit', {
       title: 'Edit Category - SB Admin',
-      user: req.session.user,
+      user: user,
       category: category,
       currentPage: 'categories',
-      selectedCompanyID: req.session.selectedCompanyID,
-      isAdmin: req.session.user.IsAdmin,
-      isNew: false
+      selectedCompanyID: req.session.selectedCompanyID || null,
+      isAdmin: user.IsAdmin,
+      isNew: false,
+      selectedCompany: selectedCompany
     });
   }
 });
@@ -168,107 +215,55 @@ app.post('/admin/categories/add', async (req, res) => {
   }
 });
 
-app.get('/admin/environment-objects', (req, res) => {
+app.get('/admin/select-company/:companyId', async (req, res) => {
   if (!req.session.user) return res.redirect('/admin/login');
+
+  const companyId = req.params.companyId;
+  if (!mongoose.Types.ObjectId.isValid(companyId)) {
+    return res.status(400).send('Invalid company ID');
+  }
+
+  // Verify the company is in the user's Companies list
+  const user = await User.findById(req.session.user._id).populate('Companies').lean();
+  const company = user.Companies.find(c => c._id.toString() === companyId);
+  if (!company) {
+    return res.status(403).send('You are not authorized to select this company');
+  }
+
+  // Update the session's selectedCompanyID
+  req.session.selectedCompanyID = companyId;
+  await req.session.save();
+
+  // Redirect back to the previous page or a default page
+  const redirectUrl = req.headers.referer || '/admin/categories';
+  res.redirect(redirectUrl);
+});
+
+app.get('/admin/environment-objects', async (req, res) => {
+  if (!req.session.user) return res.redirect('/admin/login');
+
+  // Populate user.Companies with full company objects
+  const user = await User.findById(req.session.user._id).populate('Companies').lean();
+  if (!user) return res.redirect('/admin/login');
+
+  // Fetch the selected company
+  let selectedCompany = null;
+  if (req.session.selectedCompanyID) {
+    selectedCompany = await Company.findById(req.session.selectedCompanyID).lean();
+  }
+
   res.render('environment-objects', {
     title: 'Environment Objects - SB Admin',
-    user: req.session.user,
+    user: user,
     currentPage: 'environment-objects',
-    selectedCompanyID: req.session.selectedCompanyID
+    selectedCompanyID: req.session.selectedCompanyID || null,
+    isAdmin: user.IsAdmin,
+    selectedCompany: selectedCompany
   });
 });
 
-app.get('/admin/event-types', (req, res) => {
-  if (!req.session.user) return res.redirect('/admin/login');
-  res.render('event-types', {
-    title: 'Event Types - SB Admin',
-    user: req.session.user,
-    currentPage: 'event-types',
-    selectedCompanyID: req.session.selectedCompanyID
-  });
-});
+app.use('/api', eventRoutes);
 
-app.get('/admin/events', (req, res) => {
-  if (!req.session.user) return res.redirect('/admin/login');
-  res.render('events', {
-    title: 'Events - SB Admin',
-    user: req.session.user,
-    currentPage: 'events',
-    selectedCompanyID: req.session.selectedCompanyID
-  });
-});
-
-app.get('/admin/notifications', (req, res) => {
-  if (!req.session.user) return res.redirect('/admin/login');
-  res.render('notifications', {
-    title: 'Notifications - SB Admin',
-    user: req.session.user,
-    currentPage: 'notifications',
-    selectedCompanyID: req.session.selectedCompanyID
-  });
-});
-
-// Existing edit routes
-app.get('/admin/companies/edit/:id', async (req, res) => {
-  if (!req.session.user) return res.redirect('/admin/login');
-  if (req.params.id === 'new') {
-    // Handle "Add New Company" case
-    res.render('company-edit', {
-      title: 'Add Company - SB Admin',
-      user: req.session.user,
-      company: {}, // Empty object for new company
-      currentPage: 'companies',
-      selectedCompanyID: req.session.selectedCompanyID,
-      isNew: true // Flag for new company
-    });
-  } else {
-    // Handle "Edit Existing Company" case
-    const company = await Company.findById(req.params.id);
-    if (!company) return res.status(404).send('Company not found');
-    res.render('company-edit', {
-      title: 'Edit Company - SB Admin',
-      user: req.session.user,
-      company: company,
-      currentPage: 'companies',
-      selectedCompanyID: req.session.selectedCompanyID,
-      isNew: false // Flag for existing company
-    });
-  }
-});
-
-app.post('/admin/companies/edit/:id', async (req, res) => {
-  const { name, registrationNumber, address, phone, email } = req.body;
-  try {
-    const company = await Company.findByIdAndUpdate(req.params.id, {
-      Name: name,
-      CompanyRegistrationNumber: registrationNumber,
-      Address: address,
-      Phone: phone,
-      Email: email
-    }, { new: true });
-    if (!company) return res.status(404).send('Company not found');
-    res.redirect('/admin/companies');
-  } catch (error) {
-    res.status(500).send('Error updating company: ' + error.message);
-  }
-});
-
-// New route for adding a company
-app.post('/admin/companies/add', async (req, res) => {
-  const { name, registrationNumber, address, phone, email } = req.body;
-  try {
-    const company = new Company({
-      Name: name,
-      CompanyRegistrationNumber: registrationNumber,
-      Address: address,
-      Phone: phone,
-      Email: email
-    });
-    await company.save();
-    res.redirect('/admin/companies');
-  } catch (error) {
-    res.status(500).send('Error creating company: ' + error.message);
-  }
-});
-
+// Start server
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

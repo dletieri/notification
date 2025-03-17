@@ -1,0 +1,76 @@
+<%- include('partials/header', { title: title }) %>
+<div id="wrapper">
+  <%- include('partials/sidebar', { currentPage: currentPage }) %>
+  <div id="content-wrapper" class="d-flex flex-column">
+    <div id="content">
+      <%- include('partials/topbar', { user: user, selectedCompany: selectedCompany }) %>
+      <div class="container-fluid">
+        <h1 class="h3 mb-4 text-gray-800"><%= isNew ? 'Add User' : 'Edit User' %></h1>
+        <div class="card shadow mb-4">
+          <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary"><%= isNew ? 'Add User Details' : 'Edit User Details' %></h6>
+          </div>
+          <div class="card-body">
+            <% if (error) { %>
+              <div class="alert alert-danger"><%= error %></div>
+            <% } %>
+            <form method="POST" action="<%= isNew ? '/admin/users/add' : '/admin/users/edit/' + editUser._id %>" class="user">
+              <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" class="form-control" id="email" name="email" value="<%= isNew ? '' : editUser.Email %>" placeholder="Enter Email" required>
+              </div>
+              <% if (isNew) { %>
+                <div class="form-group">
+                  <label for="password">Password</label>
+                  <input type="password" class="form-control" id="password" name="password" placeholder="Enter Password" required>
+                </div>
+              <% } %>
+              <div class="form-group">
+                <label for="name">Name</label>
+                <input type="text" class="form-control" id="name" name="name" value="<%= isNew ? '' : editUser.Name %>" placeholder="Enter Name" required>
+              </div>
+              <div class="form-group">
+                <label for="role">Role</label>
+                <input type="text" class="form-control" id="role" name="role" value="<%= isNew ? '' : editUser.Role %>" placeholder="Enter Role (optional)">
+              </div>
+              <div class="form-group">
+                <label for="isAdmin">Admin</label>
+                <input type="checkbox" class="form-check-input" id="isAdmin" name="isAdmin" <%= !isNew && editUser.IsAdmin ? 'checked' : '' %>>
+              </div>
+              <div class="form-group">
+                <label for="defaultCompanyID">Default Company</label>
+                <select class="form-control" id="defaultCompanyID" name="defaultCompanyID">
+                  <option value="">None</option>
+                  <% companies.forEach(company => { %>
+                    <option value="<%= company._id %>" <%= !isNew && editUser.DefaultCompanyID && company._id.toString() === editUser.DefaultCompanyID.toString() ? 'selected' : '' %>>
+                      <%= company.Name %>
+                    </option>
+                  <% }); %>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="companies">Companies</label>
+                <select class="form-control" id="companies" name="companies" multiple>
+                  <% companies.forEach(company => { %>
+                    <option value="<%= company._id %>" 
+                            <%= 
+                              (editUser.Companies && Array.isArray(editUser.Companies) && editUser.Companies.some(c => c._id && c._id.toString() === company._id.toString())) || 
+                              (!isNew && editUser._id && editUser.Companies && editUser.Companies.includes(company._id.toString())) 
+                              ? 'selected' : '' 
+                            %>>
+                      <%= company.Name %>
+                    </option>
+                  <% }); %>
+                </select>
+              </div>
+              <button type="submit" class="btn btn-primary btn-user"><%= isNew ? 'Create User' : 'Update User' %></button>
+              <a href="/admin/users" class="btn btn-secondary btn-user">Cancel</a>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+    <%- include('partials/footer') %>
+  </div>
+</div>
+<%- include('partials/scripts') %>

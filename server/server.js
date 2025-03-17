@@ -457,6 +457,231 @@ app.post('/admin/event-types/add', async (req, res) => {
 });
 
 
+app.get('/admin/users', async (req, res) => {
+  if (!req.session.user) return res.redirect('/admin/login');
+  if (!req.session.user.IsAdmin) return res.status(403).send('Access denied: Admins only');
+
+  // Populate user.Companies with full company objects
+  const user = await User.findById(req.session.user._id).populate('Companies').lean();
+  if (!user) return res.redirect('/admin/login');
+
+  // Fetch all users with populated Companies and DefaultCompanyID
+  const users = await User.find()
+    .populate('Companies', 'Name')
+    .populate('DefaultCompanyID', 'Name')
+    .lean();
+
+  // Fetch the selected company
+  let selectedCompany = null;
+  if (req.session.selectedCompanyID) {
+    selectedCompany = await Company.findById(req.session.selectedCompanyID).lean();
+  }
+
+  res.render('users', {
+    title: 'Users - SB Admin',
+    user: user,
+    users: users,
+    currentPage: 'users',
+    selectedCompanyID: req.session.selectedCompanyID || null,
+    isAdmin: user.IsAdmin,
+    selectedCompany: selectedCompany
+  });
+});
+
+
+app.get('/admin/users/edit/:id', async (req, res) => {
+  if (!req.session.user) return res.redirect('/admin/login');
+  if (!req.session.user.IsAdmin) return res.status(403).send('Access denied: Admins only');
+
+  // Populate user.Companies with full company objects
+  const user = await User.findById(req.session.user._id).populate('Companies').lean();
+  if (!user) return res.redirect('/admin/login');
+
+  // Fetch all companies for the dropdown
+  const companies = await Company.find().lean();
+
+  // Fetch the selected company
+  let selectedCompany = null;
+  if (req.session.selectedCompanyID) {
+    selectedCompany = await Company.findById(req.session.selectedCompanyID).lean();
+  }
+
+  if (req.params.id === 'new') {
+    res.render('user-edit', {
+      title: 'Add User - SB Admin',
+      user: user,
+      editUser: {},
+      companies: companies,
+      currentPage: 'users',
+      selectedCompanyID: req.session.selectedCompanyID || null,
+      isAdmin: user.IsAdmin,
+      isNew: true,
+      selectedCompany: selectedCompany,
+      error: null
+    });
+  } else {
+    const editUser = await User.findById(req.params.id).populate('Companies', 'Name').lean();
+    if (!editUser) return res.status(404).send('User not found');
+    res.render('user-edit', {
+      title: 'Edit User - SB Admin',
+      user: user,
+      editUser: editUser,
+      companies: companies,
+      currentPage: 'users',
+      selectedCompanyID: req.session.selectedCompanyID || null,
+      isAdmin: user.IsAdmin,
+      isNew: false,
+      selectedCompany: selectedCompany,
+      error: null
+    });
+  }
+});
+
+app.post('/admin/users/edit/:id', async (req, res) => {
+  if (!req.session.user.IsAdmin) return res.status(403).send('Access denied: Admins only');
+
+  const { email, name, role, isAdmin, defaultCompanyID, companies } = req.body;
+
+  try {
+    // Validate email uniqueness (excluding the current user)
+    const existingUser = await User.findOne({ Email: email, _id: { $ne: req.params.id } });
+    if (existingUser) {
+      const user = await User.findById(req.session.user._id).populate('Companies').lean();
+      const companiesList = await Company.find().lean();
+      let selectedCompany = null;
+      if (req.session.selectedCompanyID) {
+        selectedCompany = await Company.findById(req.session.selectedCompanyID).lean();
+      }
+      return res.render('user-edit', {
+        title: 'Edit User - SB Admin',
+        user: user,
+        editUser: { Email: email, Name: name, Role: role, IsAdmin: isAdmin === 'on', DefaultCompanyID: defaultCompanyID, Companies: companies },
+        companies: companiesList,
+        currentPage: 'users',
+        selectedCompanyID: req.session.selectedCompanyID || null,
+        isAdmin: user.IsAdmin,
+        isNew: false,
+        selectedCompany: selectedCompany,
+        error: 'Email is already in use'
+      });
+    }
+
+    const updateData = {
+      Email: email,
+      Name: name,
+      Role: role || '',
+      IsAdmin: isAdmin === 'on',
+      DefaultCompanyID: defaultCompanyID ? new mongoose.Types.ObjectId(defaultCompanyID) : null,
+      Companies: companies ? (Array.isArray(companies) ? companies : [companies]).map(id => new mongoose.Types.ObjectId(id)) : []
+    };
+    const updatedUser = await User.findByIdAndUpdate(req.params.id, updateData, { new: true, runValidators: true });
+    if (!updatedUser) return res.status(404).send('User not found');
+    res.redirect('/admin/users');
+  } catch (error) {
+    const user = await User.findById(req.session.user._id).populate('Companies').lean();
+    const companiesList = await Company.find().lean();
+    let selectedCompany = null;
+    if (req.session.selectedCompanyID) {
+      selectedCompany = await Company.findById(req.session.selectedCompanyID).lean();
+    }
+    res.render('user-edit', {
+      title: 'Edit User - SB Admin',
+      user: user,
+      editUser: { Email: email, Name: name, Role: role, IsAdmin: isAdmin === 'on', DefaultCompanyID: defaultCompanyID, Companies: companies },
+      companies: companiesList,
+      currentPage: 'users',
+      selectedCompanyID: req.session.selectedCompanyID || null,
+      isAdmin: user.IsAdmin,
+      isNew: false,
+      selectedCompany: selectedCompany,
+      error: 'Error updating user: ' + error.message
+    });
+  }
+});
+
+app.post('/admin/users/add', async (req, res) => {
+  if (!req.session.user.IsAdmin) return res.status(403).send('Access denied: Admins only');
+
+  const { email, password, name, role, isAdmin, defaultCompanyID, companies } = req.body;
+
+  try {
+    // Validate email uniqueness
+    const existingUser = await User.findOne({ Email: email });
+    if (existingUser) {
+      const user = await User.findById(req.session.user._id).populate('Companies').lean();
+      const companiesList = await Company.find().lean();
+      let selectedCompany = null;
+      if (req.session.selectedCompanyID) {
+        selectedCompany = await Company.findById(req.session.selectedCompanyID).lean();
+      }
+      return res.render('user-edit', {
+        title: 'Add User - SB Admin',
+        user: user,
+        editUser: { Email: email, Name: name, Role: role, IsAdmin: isAdmin === 'on', DefaultCompanyID: defaultCompanyID, Companies: companies },
+        companies: companiesList,
+        currentPage: 'users',
+        selectedCompanyID: req.session.selectedCompanyID || null,
+        isAdmin: user.IsAdmin,
+        isNew: true,
+        selectedCompany: selectedCompany,
+        error: 'Email is already in use'
+      });
+    }
+
+    const newUser = new User({
+      Email: email,
+      Password: password, // Note: Should be hashed with bcrypt in a real app
+      Name: name,
+      Role: role || '',
+      IsAdmin: isAdmin === 'on',
+      DefaultCompanyID: defaultCompanyID ? new mongoose.Types.ObjectId(defaultCompanyID) : null,
+      Companies: companies ? (Array.isArray(companies) ? companies : [companies]).map(id => new mongoose.Types.ObjectId(id)) : [],
+      RegistrationDate: new Date()
+    });
+    await newUser.save();
+    res.redirect('/admin/users');
+  } catch (error) {
+    const user = await User.findById(req.session.user._id).populate('Companies').lean();
+    const companiesList = await Company.find().lean();
+    let selectedCompany = null;
+    if (req.session.selectedCompanyID) {
+      selectedCompany = await Company.findById(req.session.selectedCompanyID).lean();
+    }
+    res.render('user-edit', {
+      title: 'Add User - SB Admin',
+      user: user,
+      editUser: { Email: email, Name: name, Role: role, IsAdmin: isAdmin === 'on', DefaultCompanyID: defaultCompanyID, Companies: companies },
+      companies: companiesList,
+      currentPage: 'users',
+      selectedCompanyID: req.session.selectedCompanyID || null,
+      isAdmin: user.IsAdmin,
+      isNew: true,
+      selectedCompany: selectedCompany,
+      error: 'Error creating user: ' + error.message
+    });
+  }
+});
+
+
+app.post('/admin/users/delete/:id', async (req, res) => {
+  if (!req.session.user.IsAdmin) return res.status(403).send('Access denied: Admins only');
+
+  try {
+    const user = await User.findByIdAndDelete(req.params.id);
+    if (!user) return res.status(404).send('User not found');
+    if (user._id.toString() === req.session.user._id.toString()) {
+      req.session.destroy(() => res.redirect('/admin/login'));
+    } else {
+      res.redirect('/admin/users');
+    }
+  } catch (error) {
+    res.status(500).send('Error deleting user: ' + error.message);
+  }
+});
+
+
+
+
 
 app.use('/api', eventRoutes);
 

@@ -6,6 +6,7 @@ const session = require('express-session');
 const MongoDBStore = require('connect-mongodb-session')(session);
 const path = require('path');
 const eventRoutes = require('./routes/eventRoutes');
+const QRCode = require('qrcode');
 
 const app = express();
 
@@ -340,12 +341,15 @@ app.get('/admin/select-company/:companyId', async (req, res) => {
 
 app.get('/admin/environment-objects', async (req, res) => {
   if (!req.session.user) return res.redirect('/admin/login');
+  if (!req.session.user.IsAdmin) return res.status(403).send('Access denied: Admins only');
 
-  // Populate user.Companies with full company objects
   const user = await User.findById(req.session.user._id).populate('Companies').lean();
   if (!user) return res.redirect('/admin/login');
 
-  // Fetch the selected company
+  const envObjects = await EnvironmentObject.find()
+    .populate('CompanyID', 'Name')
+    .lean();
+
   let selectedCompany = null;
   if (req.session.selectedCompanyID) {
     selectedCompany = await Company.findById(req.session.selectedCompanyID).lean();
@@ -354,6 +358,7 @@ app.get('/admin/environment-objects', async (req, res) => {
   res.render('environment-objects', {
     title: 'Environment Objects - SB Admin',
     user: user,
+    envObjects: envObjects,
     currentPage: 'environment-objects',
     selectedCompanyID: req.session.selectedCompanyID || null,
     isAdmin: user.IsAdmin,
@@ -768,6 +773,36 @@ app.post('/admin/users/delete/:id', async (req, res) => {
     res.status(500).send('Error deleting user: ' + error.message);
   }
 });
+
+
+// GET /admin/generate-qr/:id - Generate QR code for an EnvironmentObject
+app.get('/admin/generate-qr/:id', async (req, res) => {
+  if (!req.session.user) return res.status(403).json({ error: 'Unauthorized' });
+  if (!req.session.user.IsAdmin) return res.status(403).json({ error: 'Admins only' });
+
+  const envObjectId = req.params.id;
+  if (!mongoose.Types.ObjectId.isValid(envObjectId)) {
+    return res.status(400).json({ error: 'Invalid Environment Object ID' });
+  }
+
+  try {
+    const envObject = await EnvironmentObject.findById(envObjectId).lean();
+    if (!envObject) {
+      return res.status(404).json({ error: 'Environment Object not found' });
+    }
+
+    // Generate the QR code URL
+    const qrUrl = `${process.env.BASE_URL}/?objID=${envObjectId}`;
+
+    // Generate QR code as a base64 data URL
+    const qrCodeDataUrl = await QRCode.toDataURL(qrUrl);
+    res.json({ qrCode: qrCodeDataUrl, qrUrl: qrUrl });
+  } catch (error) {
+    console.error('Error generating QR code:', error);
+    res.status(500).json({ error: 'Error generating QR code' });
+  }
+});
+
 
 
 

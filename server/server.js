@@ -360,13 +360,19 @@ app.get('/admin/categories', async (req, res) => {
     selectedCompany = await Company.findById(req.session.selectedCompanyID).lean();
   }
 
+  // Fetch categories for the selected company
+  const categories = req.session.selectedCompanyID
+    ? await Category.find({ CompanyID: req.session.selectedCompanyID }).lean()
+    : [];
+
   res.render('categories', {
     title: 'Categories - SB Admin',
     user: user,
     currentPage: 'categories',
     selectedCompanyID: req.session.selectedCompanyID || null,
     isAdmin: user.IsAdmin,
-    selectedCompany: selectedCompany
+    selectedCompany: selectedCompany,
+    categories: categories
   });
 });
 
@@ -472,9 +478,12 @@ app.get('/admin/environment-objects', async (req, res) => {
   const user = await User.findById(req.session.user._id).populate('Companies').lean();
   if (!user) return res.redirect('/admin/login');
 
-  const envObjects = await EnvironmentObject.find()
-    .populate('CompanyID', 'Name')
-    .lean();
+  // Fetch environment objects for the selected company
+  const envObjects = req.session.selectedCompanyID
+    ? await EnvironmentObject.find({ CompanyID: req.session.selectedCompanyID })
+      .populate('CompanyID', 'Name')
+      .lean()
+    : [];
 
   let selectedCompany = null;
   if (req.session.selectedCompanyID) {
@@ -573,6 +582,7 @@ app.post('/admin/environment-objects/add', async (req, res) => {
   }
 });
 
+// GET /admin/event-types
 app.get('/admin/event-types', async (req, res) => {
   if (!req.session.user) return res.redirect('/admin/login');
 
@@ -586,13 +596,26 @@ app.get('/admin/event-types', async (req, res) => {
     selectedCompany = await Company.findById(req.session.selectedCompanyID).lean();
   }
 
+  // Fetch event types for the selected company with enforced filtering and debugging
+  let eventTypes = [];
+  if (req.session.selectedCompanyID && mongoose.Types.ObjectId.isValid(req.session.selectedCompanyID)) {
+    const companyId = new mongoose.Types.ObjectId(req.session.selectedCompanyID); // Explicit type conversion
+    eventTypes = await EventType.find({ CompanyID: companyId })
+      .populate('CategoryID', 'Name')
+      .lean();
+    console.log(`Querying EventTypes for CompanyID: ${companyId}, Results:`, eventTypes);
+  } else {
+    console.log('No valid selectedCompanyID in session:', req.session.selectedCompanyID);
+  }
+
   res.render('event-types', {
     title: 'Event Types - SB Admin',
     user: user,
     currentPage: 'event-types',
     selectedCompanyID: req.session.selectedCompanyID || null,
     isAdmin: user.IsAdmin,
-    selectedCompany: selectedCompany
+    selectedCompany: selectedCompany,
+    eventTypes: eventTypes
   });
 });
 
@@ -677,21 +700,21 @@ app.post('/admin/event-types/add', async (req, res) => {
   }
 });
 
+// GET /admin/users
 app.get('/admin/users', async (req, res) => {
   if (!req.session.user) return res.redirect('/admin/login');
   if (!req.session.user.IsAdmin) return res.status(403).send('Access denied: Admins only');
 
-  // Populate user.Companies with full company objects
   const user = await User.findById(req.session.user._id).populate('Companies').lean();
   if (!user) return res.redirect('/admin/login');
 
-  // Fetch all users with populated Companies and DefaultCompanyID
-  const users = await User.find()
-    .populate('Companies', 'Name')
-    .populate('DefaultCompanyID', 'Name')
-    .lean();
+  const users = req.session.selectedCompanyID && mongoose.Types.ObjectId.isValid(req.session.selectedCompanyID)
+    ? await User.find({ Companies: req.session.selectedCompanyID })
+        .populate('Companies', 'Name')
+        .populate('DefaultCompanyID', 'Name')
+        .lean()
+    : [];
 
-  // Fetch the selected company
   let selectedCompany = null;
   if (req.session.selectedCompanyID) {
     selectedCompany = await Company.findById(req.session.selectedCompanyID).lean();

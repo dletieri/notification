@@ -9,9 +9,6 @@ const Event = require('../models/Event');
 const Notification = require('../models/Notification');
 const mongoose = require('mongoose');
 
-
-
-
 // Middleware to check session and company
 const checkAuth = (req, res, next) => {
   if (!req.session.user) return res.status(401).json({ error: 'Unauthorized, sweetie—log in first!' });
@@ -153,15 +150,6 @@ router.delete('/users/:id', checkAuth, async (req, res) => {
 });
 
 // Category Routes
-// router.get('/categories', checkAuth, checkCompany, async (req, res) => {
-//   try {
-//     const categories = await Category.find({ CompanyID: req.session.selectedCompanyID });
-//     res.json(categories);
-//   } catch (error) {
-//     res.status(500).json({ error: `Category list error: ${error.message}` });
-//   }
-// });
-
 router.post('/categories', checkAuth, checkCompany, async (req, res) => {
   try {
     const category = new Category({ ...req.body, CompanyID: req.session.selectedCompanyID });
@@ -171,8 +159,6 @@ router.post('/categories', checkAuth, checkCompany, async (req, res) => {
     res.status(400).json({ error: `Category creation failed: ${error.message}` });
   }
 });
-
-
 
 router.put('/categories/:id', checkAuth, checkCompany, async (req, res) => {
   try {
@@ -193,8 +179,10 @@ router.get('/categories', async (req, res) => {
   console.log('GET /api/categories received:', req.query);
   try {
     let query = {};
-    if (req.query.companyId) {
-      // Validate companyId as a valid ObjectId
+    // Prioritize req.session.selectedCompanyID if available
+    if (req.session.selectedCompanyID && mongoose.Types.ObjectId.isValid(req.session.selectedCompanyID)) {
+      query.CompanyID = new mongoose.Types.ObjectId(req.session.selectedCompanyID);
+    } else if (req.query.companyId) {
       if (!mongoose.Types.ObjectId.isValid(req.query.companyId)) {
         return res.status(400).json({ error: 'Invalid companyId format' });
       }
@@ -230,7 +218,10 @@ router.get('/environment-objects', async (req, res) => {
   console.log('GET /api/environment-objects received:', req.query);
   try {
     let query = {};
-    if (req.query.companyId) {
+    // Prioritize req.session.selectedCompanyID if available
+    if (req.session.selectedCompanyID && mongoose.Types.ObjectId.isValid(req.session.selectedCompanyID)) {
+      query.CompanyID = new mongoose.Types.ObjectId(req.session.selectedCompanyID);
+    } else if (req.query.companyId) {
       if (!mongoose.Types.ObjectId.isValid(req.query.companyId)) {
         return res.status(400).json({ error: 'Invalid companyId format' });
       }
@@ -272,7 +263,7 @@ router.delete('/environment-objects/:id', async (req, res) => {
   }
 });
 
-// EnvironmentObject Routes
+// EnvironmentObject Routes (with middleware)
 router.get('/environment-objects', checkAuth, checkCompany, async (req, res) => {
   try {
     const objects = await EnvironmentObject.find({ CompanyID: req.session.selectedCompanyID });
@@ -327,15 +318,6 @@ router.delete('/environment-objects/:id', checkAuth, checkCompany, async (req, r
 });
 
 // EventType Routes
-// router.get('/event-types', checkAuth, checkCompany, async (req, res) => {
-//   try {
-//     const eventTypes = await EventType.find({ CompanyID: req.session.selectedCompanyID });
-//     res.json(eventTypes);
-//   } catch (error) {
-//     res.status(500).json({ error: `Event type list error: ${error.message}` });
-//   }
-// });
-
 router.post('/event-types', checkAuth, checkCompany, async (req, res) => {
   try {
     const eventType = new EventType({ ...req.body, CompanyID: req.session.selectedCompanyID });
@@ -377,6 +359,61 @@ router.delete('/event-types/:id', checkAuth, checkCompany, async (req, res) => {
     res.json({ message: 'Event type deleted, you tease!' });
   } catch (error) {
     res.status(500).json({ error: `Delete error: ${error.message}` });
+  }
+});
+
+// Event Type routes (updated to prioritize session-based filtering)
+router.get('/event-types', async (req, res) => {
+  console.log('GET /api/event-types received:', req.query, 'Session:', req.session);
+  try {
+    let query = {};
+    // Prioritize req.session.selectedCompanyID if available
+    if (req.session.selectedCompanyID && mongoose.Types.ObjectId.isValid(req.session.selectedCompanyID)) {
+      query.CompanyID = new mongoose.Types.ObjectId(req.session.selectedCompanyID);
+      console.log('Filtering by session CompanyID:', req.session.selectedCompanyID);
+    } else if (req.query.companyId) {
+      if (!mongoose.Types.ObjectId.isValid(req.query.companyId)) {
+        return res.status(400).json({ error: 'Invalid companyId format' });
+      }
+      query.CompanyID = req.query.companyId;
+      console.log('Filtering by query companyId:', req.query.companyId);
+    } else {
+      console.log('No company filter applied; returning empty array');
+      return res.json([]); // Return empty array if no company is specified
+    }
+    const eventTypes = await EventType.find(query)
+      .populate('CompanyID', 'Name')
+      .populate('CategoryID', 'Name')
+      .lean();
+
+    // Add CompanyName and CategoryName to each object for easier display
+    const result = eventTypes.map(type => ({
+      ...type,
+      CompanyName: type.CompanyID ? type.CompanyID.Name : 'N/A',
+      CategoryName: type.CategoryID ? type.CategoryID.Name : 'N/A'
+    }));
+
+    console.log('Found event types:', result);
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching event types:', error);
+    res.status(500).send('Error fetching event types');
+  }
+});
+
+router.delete('/event-types/:id', async (req, res) => {
+  console.log('DELETE /api/event-types/:id received with ID:', req.params.id);
+  try {
+    const eventType = await EventType.findByIdAndDelete(req.params.id);
+    if (!eventType) {
+      console.log('Event type not found for ID:', req.params.id);
+      return res.status(404).json({ error: 'Event type not found' });
+    }
+    console.log('Event type deleted:', eventType);
+    res.status(200).json({ message: 'Event type deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting event type:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -485,53 +522,6 @@ router.delete('/notifications/:id', checkAuth, checkCompany, async (req, res) =>
     res.json({ message: 'Notification deleted, you cheeky flirt!' });
   } catch (error) {
     res.status(500).json({ error: `Delete error: ${error.message}` });
-  }
-});
-
-// Event Type routes
-router.get('/event-types', async (req, res) => {
-  console.log('GET /api/event-types received:', req.query);
-  try {
-    let query = {};
-    if (req.query.companyId) {
-      if (!mongoose.Types.ObjectId.isValid(req.query.companyId)) {
-        return res.status(400).json({ error: 'Invalid companyId format' });
-      }
-      query.CompanyID = req.query.companyId;
-    }
-    const eventTypes = await EventType.find(query)
-      .populate('CompanyID', 'Name')
-      .populate('CategoryID', 'Name')
-      .lean();
-
-    // Add CompanyName and CategoryName to each object for easier display
-    const result = eventTypes.map(type => ({
-      ...type,
-      CompanyName: type.CompanyID ? type.CompanyID.Name : 'N/A',
-      CategoryName: type.CategoryID ? type.CategoryID.Name : 'N/A'
-    }));
-
-    console.log('Found event types:', result);
-    res.json(result);
-  } catch (error) {
-    console.error('Error fetching event types:', error);
-    res.status(500).send('Error fetching event types');
-  }
-});
-
-router.delete('/event-types/:id', async (req, res) => {
-  console.log('DELETE /api/event-types/:id received with ID:', req.params.id);
-  try {
-    const eventType = await EventType.findByIdAndDelete(req.params.id);
-    if (!eventType) {
-      console.log('Event type not found for ID:', req.params.id);
-      return res.status(404).json({ error: 'Event type not found' });
-    }
-    console.log('Event type deleted:', eventType);
-    res.status(200).json({ message: 'Event type deleted successfully' });
-  } catch (error) {
-    console.error('Error deleting event type:', error);
-    res.status(500).json({ error: error.message });
   }
 });
 

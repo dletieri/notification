@@ -1,0 +1,229 @@
+<%- include('partials/header', { title: title }) %>
+<style>
+  .btn-close {
+    background: transparent url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23000'%3e%3cpath d='M.293.293a1 1 0 011.414 0L8 6.586 14.293.293a1 1 0 111.414 1.414L9.414 8l6.293 6.293a1 1 0 01-1.414 1.414L8 9.414l-6.293 6.293a1 1 0 01-1.414-1.414L6.586 8 .293 1.707A1 1 0 01.293.293z'/%3e%3c/svg%3e") center/1em auto no-repeat;
+    opacity: 0.5;
+  }
+  .btn-close:hover {
+    opacity: 0.75;
+  }
+  .card {
+    margin-bottom: 20px;
+    transition: box-shadow 0.3s ease;
+  }
+  .card:hover {
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+  }
+  canvas {
+    max-width: 100%;
+  }
+</style>
+<div id="wrapper">
+  <%- include('partials/sidebar', { currentPage: currentPage }) %>
+  <div id="content-wrapper" class="d-flex flex-column">
+    <div id="content">
+      <%- include('partials/topbar', { user: user, selectedCompany: selectedCompany }) %>
+      <div class="container-fluid">
+        <h1 class="h3 mb-4 text-gray-800">Dashboard</h1>
+
+        <!-- Dashboard Cards -->
+        <div class="row">
+          <!-- Card 1: Account Information -->
+          <div class="col-md-6">
+            <div class="card shadow mb-4">
+              <div class="card-header py-3 bg-primary text-white">
+                <h5 class="m-0 font-weight-bold">Account Information</h5>
+              </div>
+              <div class="card-body">
+                <ul class="list-unstyled">
+                  <li class="mb-2"><strong>Number of Objects:</strong> <%= metrics.objectCount %> (<%= metrics.totalObjectCount %> across all your companies)</li>
+                  <li class="mb-2"><strong>Number of Categories:</strong> <%= metrics.categoryCount %> (<%= metrics.totalCategoryCount %> across all your companies)</li>
+                  <li class="mb-2"><strong>Number of Companies:</strong> <%= metrics.companyCount %></li>
+                  <li class="mb-2"><strong>Total Events Reported:</strong> <%= metrics.eventCount %> (<%= metrics.totalEventCount %> across all your companies)</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <!-- Card 2: Events per Environment Object Type -->
+          <div class="col-md-6">
+            <div class="card shadow mb-4">
+              <div class="card-header py-3 bg-success text-white">
+                <h5 class="m-0 font-weight-bold">Events per Environment Object Type</h5>
+              </div>
+              <div class="card-body">
+                <canvas id="envObjectPieChart"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <!-- Card 3: Events per Event Type -->
+          <div class="col-md-6">
+            <div class="card shadow mb-4">
+              <div class="card-header py-3 bg-info text-white">
+                <h5 class="m-0 font-weight-bold">Events per Event Type</h5>
+              </div>
+              <div class="card-body">
+                <canvas id="eventTypePieChart"></canvas>
+              </div>
+            </div>
+          </div>
+          <!-- Card 4: Objects with Events (Last Month) -->
+          <div class="col-md-6">
+            <div class="card shadow mb-4">
+              <div class="card-header py-3 bg-warning text-white">
+                <h5 class="m-0 font-weight-bold">Objects with Events (Last Month)</h5>
+              </div>
+              <div class="card-body">
+                <% if (objectsWithEvents.length > 0) { %>
+                  <ul class="list-unstyled">
+                    <% objectsWithEvents.forEach(obj => { %>
+                      <li class="mb-2"><%= obj.name %>: <%= obj.count %> events</li>
+                    <% }); %>
+                  </ul>
+                <% } else { %>
+                  <p class="text-muted">No events reported in the last month.</p>
+                <% } %>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <!-- Card 5: Events by Object Type -->
+          <div class="col-md-6">
+            <div class="card shadow mb-4">
+              <div class="card-header py-3 bg-danger text-white">
+                <h5 class="m-0 font-weight-bold">Events by Object Type</h5>
+              </div>
+              <div class="card-body">
+                <canvas id="barChart"></canvas>
+              </div>
+            </div>
+          </div>
+          <!-- Card 6: Events per Day -->
+          <div class="col-md-6">
+            <div class="card shadow mb-4">
+              <div class="card-header py-3 bg-primary text-white">
+                <h5 class="m-0 font-weight-bold">Events per Day</h5>
+              </div>
+              <div class="card-body">
+                <canvas id="lineChart"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <%- include('partials/footer') %>
+  </div>
+</div>
+
+<%- include('partials/scripts') %>
+
+<!-- Chart.js CDN for Development -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+
+<!-- JavaScript for Charts -->
+<script>
+  // Ensure Chart.js is loaded
+  if (typeof Chart === 'undefined') {
+    console.error('Chart.js is not loaded');
+  } else {
+    // Pie Chart: Events per Environment Object Type
+    const envObjectCtx = document.getElementById('envObjectPieChart').getContext('2d');
+    new Chart(envObjectCtx, {
+      type: 'pie',
+      data: {
+        labels: <%= JSON.stringify(envObjectEvents.map(e => e.name)) %>,
+        datasets: [{
+          data: <%= JSON.stringify(envObjectEvents.map(e => e.count)) %>,
+          backgroundColor: ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b', '#858796']
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'top' },
+          title: { display: true, text: 'Events by Object Type' }
+        }
+      }
+    });
+
+    // Pie Chart: Events per Event Type
+    const eventTypeCtx = document.getElementById('eventTypePieChart').getContext('2d');
+    new Chart(eventTypeCtx, {
+      type: 'pie',
+      data: {
+        labels: <%= JSON.stringify(eventTypeEvents.map(e => e.name)) %>,
+        datasets: [{
+          data: <%= JSON.stringify(eventTypeEvents.map(e => e.count)) %>,
+          backgroundColor: ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b', '#858796']
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'top' },
+          title: { display: true, text: 'Events by Event Type' }
+        }
+      }
+    });
+
+    // Bar Chart: Events by Object Type
+    const barCtx = document.getElementById('barChart').getContext('2d');
+    new Chart(barCtx, {
+      type: 'bar',
+      data: {
+        labels: <%= JSON.stringify(barChartData.map(e => e.name)) %>,
+        datasets: [{
+          label: 'Events',
+          data: <%= JSON.stringify(barChartData.map(e => e.count)) %>,
+          backgroundColor: '#4e73df',
+          borderColor: '#4e73df',
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: { beginAtZero: true, title: { display: true, text: 'Number of Events' } }
+        },
+        plugins: {
+          legend: { display: false },
+          title: { display: true, text: 'Events by Object Type' }
+        }
+      }
+    });
+
+    // Line Chart: Events per Day
+    const lineCtx = document.getElementById('lineChart').getContext('2d');
+    new Chart(lineCtx, {
+      type: 'line',
+      data: {
+        labels: <%= JSON.stringify(dailyEvents.map(e => e._id)) %>,
+        datasets: [{
+          label: 'Events',
+          data: <%= JSON.stringify(dailyEvents.map(e => e.count)) %>,
+          fill: false,
+          borderColor: '#1cc88a',
+          tension: 0.1
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: { title: { display: true, text: 'Date' } },
+          y: { beginAtZero: true, title: { display: true, text: 'Number of Events' } }
+        },
+        plugins: {
+          legend: { position: 'top' },
+          title: { display: true, text: 'Events per Day' }
+        }
+      }
+    });
+  }
+</script>

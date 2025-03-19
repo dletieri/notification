@@ -144,28 +144,154 @@ app.get('/thanks', (req, res) => {
   });
 });
 
-
+// GET /admin - Render the dashboard
 app.get('/admin', async (req, res) => {
   if (!req.session.user) return res.redirect('/admin/login');
+  if (!req.session.user.IsAdmin) return res.status(403).send('Access denied: Admins only');
 
-  // Populate user.Companies with full company objects
   const user = await User.findById(req.session.user._id).populate('Companies').lean();
   if (!user) return res.redirect('/admin/login');
 
-  // Fetch the selected company
-  let selectedCompany = null;
-  if (req.session.selectedCompanyID) {
-    selectedCompany = await Company.findById(req.session.selectedCompanyID).lean();
-  }
+  const selectedCompanyID = req.session.selectedCompanyID || user.DefaultCompanyID;
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
-  res.render('index', {
-    title: 'Dashboard - SB Admin',
-    user: user,
-    currentPage: 'dashboard',
-    selectedCompanyID: req.session.selectedCompanyID || null,
-    isAdmin: user.IsAdmin,
-    selectedCompany: selectedCompany
-  });
+  try {
+    // Account Information Metrics
+    const objectCount = await EnvironmentObject.countDocuments({ CompanyID: selectedCompanyID });
+    const totalObjectCount = await EnvironmentObject.countDocuments({ CompanyID: { $in: user.Companies } });
+    const categoryCount = (await EventType.distinct('CategoryID', { CompanyID: selectedCompanyID })).length;
+    const totalCategoryCount = (await EventType.distinct('CategoryID', { CompanyID: { $in: user.Companies } })).length;
+    const companyCount = await Company.countDocuments();
+    const eventCount = await Event.countDocuments({ CompanyID: selectedCompanyID });
+    const totalEventCount = await Event.countDocuments({ CompanyID: { $in: user.Companies } });
+
+    // Pie Chart Data: Events per Environment Object Type
+    const envObjectEvents = await Event.aggregate([
+      { $match: { CompanyID: selectedCompanyID } },
+      {
+        $group: {
+          _id: '$EnvironmentObjectID',
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $lookup: {
+          from: 'environmentobjects',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'object'
+        }
+      },
+      { $unwind: '$object' },
+      { $project: { name: '$object.Name', count: 1 } }
+    ]).exec().then(results => results.map(result => ({ ...result, count: result.count || 0 })));
+
+    // Pie Chart Data: Events per Event Type
+    const eventTypeEvents = await Event.aggregate([
+      { $match: { CompanyID: selectedCompanyID } },
+      {
+        $group: {
+          _id: '$EventTypeID',
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $lookup: {
+          from: 'eventtypes',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'type'
+        }
+      },
+      { $unwind: '$type' },
+      { $project: { name: '$type.Name', count: 1 } }
+    ]).exec().then(results => results.map(result => ({ ...result, count: result.count || 0 })));
+
+    // List of Objects with Events (Last Month)
+    const objectsWithEvents = await Event.aggregate([
+      { $match: { CompanyID: selectedCompanyID, Date: { $gte: thirtyDaysAgo } } },
+      {
+        $group: {
+          _id: '$EnvironmentObjectID',
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $lookup: {
+          from: 'environmentobjects',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'object'
+        }
+      },
+      { $unwind: '$object' },
+      { $project: { name: '$object.Name', count: 1 } }
+    ]).exec().then(results => results.map(result => ({ ...result, count: result.count || 0 })));
+
+    // Bar Chart Data: Events by Object Type
+    const barChartData = await Event.aggregate([
+      { $match: { CompanyID: selectedCompanyID } },
+      {
+        $group: {
+          _id: '$EnvironmentObjectID',
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $lookup: {
+          from: 'environmentobjects',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'object'
+        }
+      },
+      { $unwind: '$object' },
+      { $project: { name: '$object.Name', count: 1 } }
+    ]).exec().then(results => results.map(result => ({ ...result, count: result.count || 0 })));
+
+    // Line Chart Data: Events per Day (Last 30 Days)
+    const dailyEvents = await Event.aggregate([
+      { $match: { CompanyID: selectedCompanyID, Date: { $gte: thirtyDaysAgo } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%Y-%m-%d', date: '$Date' } },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { '_id': 1 } }
+    ]).exec().then(results => results);
+
+    let selectedCompany = null;
+    if (selectedCompanyID) {
+      selectedCompany = await Company.findById(selectedCompanyID).lean();
+    }
+
+    res.render('admin', {
+      title: 'Dashboard - SB Admin',
+      user: user,
+      currentPage: 'admin',
+      selectedCompanyID: selectedCompanyID,
+      isAdmin: user.IsAdmin,
+      selectedCompany: selectedCompany,
+      metrics: {
+        objectCount,
+        totalObjectCount,
+        categoryCount,
+        totalCategoryCount,
+        companyCount,
+        eventCount,
+        totalEventCount
+      },
+      envObjectEvents,
+      eventTypeEvents,
+      objectsWithEvents,
+      barChartData,
+      dailyEvents
+    });
+  } catch (error) {
+    console.error('Error loading dashboard:', error);
+    res.status(500).send('Error loading dashboard: ' + error.message);
+  }
 });
 
 app.get('/admin/login', (req, res) => {
@@ -551,7 +677,6 @@ app.post('/admin/event-types/add', async (req, res) => {
   }
 });
 
-
 app.get('/admin/users', async (req, res) => {
   if (!req.session.user) return res.redirect('/admin/login');
   if (!req.session.user.IsAdmin) return res.status(403).send('Access denied: Admins only');
@@ -582,7 +707,6 @@ app.get('/admin/users', async (req, res) => {
     selectedCompany: selectedCompany
   });
 });
-
 
 app.get('/admin/users/edit/:id', async (req, res) => {
   if (!req.session.user) return res.redirect('/admin/login');
@@ -757,7 +881,6 @@ app.post('/admin/users/add', async (req, res) => {
   }
 });
 
-
 app.post('/admin/users/delete/:id', async (req, res) => {
   if (!req.session.user.IsAdmin) return res.status(403).send('Access denied: Admins only');
 
@@ -773,7 +896,6 @@ app.post('/admin/users/delete/:id', async (req, res) => {
     res.status(500).send('Error deleting user: ' + error.message);
   }
 });
-
 
 // GET /admin/generate-qr/:id - Generate QR code for an EnvironmentObject
 app.get('/admin/generate-qr/:id', async (req, res) => {
@@ -803,10 +925,128 @@ app.get('/admin/generate-qr/:id', async (req, res) => {
   }
 });
 
+// Updated GET /admin/companies/edit/:id - Edit or create a new Company
+app.get('/admin/companies/edit/:id', async (req, res) => {
+  if (!req.session.user) return res.redirect('/admin/login');
+  if (!req.session.user.IsAdmin) return res.status(403).send('Access denied: Admins only');
 
+  const companyId = req.params.id;
+  let company = { Name: '', CompanyRegistrationNumber: '', Address: '', Phone: '', Email: '' }; // Default for new company
 
+  if (companyId !== 'new') {
+    company = await Company.findById(companyId).lean();
+    if (!company) return res.status(404).send('Company not found');
+  }
 
+  // Fetch selected company based on session or default
+  let selectedCompany = null;
+  const selectedCompanyID = req.session.selectedCompanyID || req.session.user.DefaultCompanyID;
+  if (selectedCompanyID) {
+    selectedCompany = await Company.findById(selectedCompanyID).lean();
+  }
 
+  res.render('company-edit', {
+    title: companyId === 'new' ? 'Add Company - SB Admin' : 'Edit Company - SB Admin',
+    user: req.session.user,
+    company: company,
+    currentPage: 'companies',
+    selectedCompanyID: selectedCompanyID,
+    isAdmin: req.session.user.IsAdmin,
+    isNew: companyId === 'new',
+    selectedCompany: selectedCompany || { Name: 'No company selected' } // Fallback if null
+  });
+});
+
+// Updated POST /admin/companies/edit/:id - Save Company
+app.post('/admin/companies/edit/:id', async (req, res) => {
+  if (!req.session.user || !req.session.user.IsAdmin) {
+    return res.status(403).send('Access denied: Admins only');
+  }
+
+  const companyId = req.params.id === 'new' ? null : req.params.id;
+  const { name, registrationNumber, address, phone, email } = req.body;
+
+  // Validate input
+  const errors = [];
+  if (!name || name.trim() === '') errors.push('Name is required');
+
+  if (errors.length > 0) {
+    let selectedCompany = null;
+    const selectedCompanyID = req.session.selectedCompanyID || req.session.user.DefaultCompanyID;
+    if (selectedCompanyID) {
+      selectedCompany = await Company.findById(selectedCompanyID).lean();
+    }
+    return res.render('company-edit', {
+      title: 'Add Company - SB Admin',
+      user: req.session.user,
+      company: { Name: name, CompanyRegistrationNumber: registrationNumber, Address: address, Phone: phone, Email: email },
+      currentPage: 'companies',
+      selectedCompanyID: selectedCompanyID,
+      isAdmin: req.session.user.IsAdmin,
+      isNew: true,
+      selectedCompany: selectedCompany || { Name: 'No company selected' },
+      errors: errors
+    });
+  }
+
+  try {
+    let company;
+    if (companyId) {
+      company = await Company.findByIdAndUpdate(companyId, {
+        Name: name,
+        CompanyRegistrationNumber: registrationNumber,
+        Address: address,
+        Phone: phone,
+        Email: email
+      }, { new: true, runValidators: true }).lean();
+      if (!company) return res.status(404).send('Company not found');
+    } else {
+      company = await Company.create({
+        Name: name,
+        CompanyRegistrationNumber: registrationNumber,
+        Address: address,
+        Phone: phone,
+        Email: email
+      });
+    }
+    res.redirect('/admin/companies');
+  } catch (error) {
+    console.error('Error saving company:', error);
+    let selectedCompany = null;
+    const selectedCompanyID = req.session.selectedCompanyID || req.session.user.DefaultCompanyID;
+    if (selectedCompanyID) {
+      selectedCompany = await Company.findById(selectedCompanyID).lean();
+    }
+    res.render('company-edit', {
+      title: 'Add Company - SB Admin',
+      user: req.session.user,
+      company: { Name: name, CompanyRegistrationNumber: registrationNumber, Address: address, Phone: phone, Email: email },
+      currentPage: 'companies',
+      selectedCompanyID: selectedCompanyID,
+      isAdmin: req.session.user.IsAdmin,
+      isNew: true,
+      selectedCompany: selectedCompany || { Name: 'No company selected' },
+      errors: [error.message]
+    });
+  }
+});
+
+app.post('/admin/companies/add', async (req, res) => {
+  const { name, registrationNumber, address, phone, email } = req.body;
+  try {
+    const company = new Company({
+      Name: name,
+      CompanyRegistrationNumber: registrationNumber,
+      Address: address,
+      Phone: phone,
+      Email: email
+    });
+    await company.save();
+    res.redirect('/admin/companies');
+  } catch (error) {
+    res.status(500).send('Error creating company: ' + error.message);
+  }
+});
 
 app.use('/api', eventRoutes);
 

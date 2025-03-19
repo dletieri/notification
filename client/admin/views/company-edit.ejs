@@ -3,7 +3,7 @@
   <%- include('partials/sidebar', { currentPage: currentPage }) %>
   <div id="content-wrapper" class="d-flex flex-column">
     <div id="content">
-      <%- include('partials/topbar', { user: user }) %>
+      <%- include('partials/topbar', { user: user, selectedCompany: selectedCompany }) %>
       <div class="container-fluid">
         <h1 class="h3 mb-4 text-gray-800"><%= isNew ? 'Add Company' : 'Edit Company' %></h1>
         <div class="card shadow mb-4">

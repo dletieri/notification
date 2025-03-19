@@ -118,7 +118,7 @@ app.post('/report-event', async (req, res) => {
     const newEvent = new Event({
       CompanyID: environmentObject.CompanyID,
       CategoryID: eventType.CategoryID,
-      EventTypeID: new mongoose.Types.ObjectId(eventTypeID),
+      EventTypeID: new mongoose.Types.EObjectId(eventTypeID),
       EnvironmentObjectID: new mongoose.Types.ObjectId(objID),
       Date: new Date()
       // UserID and Details are omitted as requested
@@ -166,8 +166,13 @@ app.get('/admin', async (req, res) => {
     const totalEventCount = await Event.countDocuments({ CompanyID: { $in: user.Companies } });
 
     // Pie Chart Data: Events per Environment Object Type
+    console.log('selectedCompanyID :', selectedCompanyID); // Debug log
+    const companyId = typeof selectedCompanyID === 'string' 
+      ? new mongoose.Types.ObjectId(selectedCompanyID) 
+      : selectedCompanyID;
+
     const envObjectEvents = await Event.aggregate([
-      { $match: { CompanyID: selectedCompanyID } },
+      { $match: { CompanyID: companyId } },
       {
         $group: {
           _id: '$EnvironmentObjectID',
@@ -184,11 +189,14 @@ app.get('/admin', async (req, res) => {
       },
       { $unwind: '$object' },
       { $project: { name: '$object.Name', count: 1 } }
-    ]).exec().then(results => results.map(result => ({ ...result, count: result.count || 0 })));
+    ]).exec().then(results => {
+      console.log('envObjectEvents :', results); // Debug log
+      return results.map(result => ({ ...result, count: result.count || 0 }));
+    });
 
     // Pie Chart Data: Events per Event Type
     const eventTypeEvents = await Event.aggregate([
-      { $match: { CompanyID: selectedCompanyID } },
+      { $match: { CompanyID: companyId } },
       {
         $group: {
           _id: '$EventTypeID',
@@ -209,7 +217,7 @@ app.get('/admin', async (req, res) => {
 
     // List of Objects with Events (Last Month)
     const objectsWithEvents = await Event.aggregate([
-      { $match: { CompanyID: selectedCompanyID, Date: { $gte: thirtyDaysAgo } } },
+      { $match: { CompanyID: companyId, Date: { $gte: thirtyDaysAgo } } },
       {
         $group: {
           _id: '$EnvironmentObjectID',
@@ -230,7 +238,7 @@ app.get('/admin', async (req, res) => {
 
     // Bar Chart Data: Events by Object Type
     const barChartData = await Event.aggregate([
-      { $match: { CompanyID: selectedCompanyID } },
+      { $match: { CompanyID: companyId } },
       {
         $group: {
           _id: '$EnvironmentObjectID',
@@ -251,7 +259,7 @@ app.get('/admin', async (req, res) => {
 
     // Line Chart Data: Events per Day (Last 30 Days)
     const dailyEvents = await Event.aggregate([
-      { $match: { CompanyID: selectedCompanyID, Date: { $gte: thirtyDaysAgo } } },
+      { $match: { CompanyID: companyId, Date: { $gte: thirtyDaysAgo } } },
       {
         $group: {
           _id: { $dateToString: { format: '%Y-%m-%d', date: '$Date' } },

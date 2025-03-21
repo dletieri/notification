@@ -35,7 +35,7 @@
                 <h5 class="m-0 font-weight-bold">Events per Day</h5>
               </div>
               <div class="card-body">
-                <canvas id="lineChart"></canvas>
+                <canvas id="lineChart" style="display: block; width: 100%; height: 300px;"></canvas>
               </div>
             </div>
           </div>
@@ -199,32 +199,72 @@
       }
     });
 
-    // Line Chart: Events per Day
-    const lineCtx = document.getElementById('lineChart').getContext('2d');
+// Line Chart: Events per Day by Category
+try {
+  const lineCanvas = document.getElementById('lineChart');
+  console.log('lineChart element:', lineCanvas);
+  if (lineCanvas) {
+    const lineCtx = lineCanvas.getContext('2d');
     new Chart(lineCtx, {
       type: 'line',
       data: {
-        labels: <%- JSON.stringify(dailyEvents.map(e => e._id)) %>,
-        datasets: [{
-          label: 'Events',
-          data: <%- JSON.stringify(dailyEvents.map(e => e.count)) %>,
-          fill: false,
-          borderColor: '#1cc88a',
-          tension: 0.1
-        }]
+        labels: <%- JSON.stringify(dates) %>,
+        datasets: <%- JSON.stringify(dailyEventsByCategory) %>
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        layout: {
+          padding: 20 // Adiciona padding interno ao gráfico
+        },
         scales: {
-          x: { title: { display: true, text: 'Date' } },
-          y: { beginAtZero: true, title: { display: true, text: 'Number of Events' } }
+          x: {
+            title: {
+              display: true,
+              text: 'Date',
+              font: { size: 16 } // Aumenta o tamanho da fonte do título do eixo X
+            },
+            ticks: {
+              font: { size: 12 } // Aumenta o tamanho da fonte dos rótulos do eixo X
+            }
+          },
+          y: {
+            type: 'linear',
+            beginAtZero: true,
+            suggestedMax: <%= yAxisMax %>,
+            title: {
+              display: true,
+              text: 'Number of Eventss',
+              font: { size: 16 } // Aumenta o tamanho da fonte do título do eixo Y
+            },
+            ticks: {
+              font: { size: 12 }, // Aumenta o tamanho da fonte dos rótulos do eixo Y
+              stepSize: Math.ceil(<%= yAxisMax %> / 5)
+            }
+          }
         },
         plugins: {
-          legend: { position: 'top' },
-          title: { display: true, text: 'Events per Day' }
+          legend: {
+            position: 'top',
+            labels: {
+              font: { size: 14 } // Aumenta o tamanho da fonte da legenda
+            }
+          },
+          title: {
+            display: true,
+            text: 'Events per Day by Category',
+            font: { size: 18 } // Aumenta o tamanho da fonte do título do gráfico
+          }
         }
       }
     });
+  } else {
+    console.error('lineChart canvas not found');
+  }
+} catch (error) {
+  console.error('Error rendering lineChart:', error);
+}
+    
+    ;
   }
 </script>

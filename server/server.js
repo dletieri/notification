@@ -69,14 +69,23 @@ app.get('/', async (req, res) => {
       return res.status(404).send('Environment Object not found');
     }
 
-    // Fetch EventTypes for the company
-    const eventTypes = await EventType.find({ CompanyID: environmentObject.CompanyID._id })
+    // Get the CategoryID from the EnvironmentObject
+    const categoryID = environmentObject.CategoryID;
+    if (!categoryID) {
+      return res.status(400).send('Environment Object has no associated category');
+    }
+
+    // Fetch EventTypes that match both the CompanyID and CategoryID
+    const eventTypes = await EventType.find({
+      CompanyID: environmentObject.CompanyID._id,
+      CategoryID: categoryID
+    })
       .populate('CategoryID', 'Name')
       .lean();
 
     // If no event types found, show an error
     if (!eventTypes || eventTypes.length === 0) {
-      return res.status(400).send('No event types available for this company');
+      return res.status(400).send('No event types available for this category');
     }
 
     res.render('report-event', {
@@ -118,7 +127,7 @@ app.post('/report-event', async (req, res) => {
     const newEvent = new Event({
       CompanyID: environmentObject.CompanyID,
       CategoryID: eventType.CategoryID,
-      EventTypeID: new mongoose.Types.EObjectId(eventTypeID),
+      EventTypeID: new mongoose.Types.ObjectId(eventTypeID),
       EnvironmentObjectID: new mongoose.Types.ObjectId(objID),
       Date: new Date()
       // UserID and Details are omitted as requested
@@ -257,23 +266,75 @@ app.get('/admin', async (req, res) => {
       { $project: { name: '$object.Name', count: 1 } }
     ]).exec().then(results => results.map(result => ({ ...result, count: result.count || 0 })));
 
-    // Line Chart Data: Events per Day (Last 30 Days)
-    const dailyEvents = await Event.aggregate([
+    // Line Chart Data: Events per Day by Category (Last 30 Days)
+    const dailyEventsByCategoryRaw = await Event.aggregate([
       { $match: { CompanyID: companyId, Date: { $gte: thirtyDaysAgo } } },
       {
         $group: {
-          _id: { $dateToString: { format: '%Y-%m-%d', date: '$Date' } },
+          _id: {
+            date: { $dateToString: { format: '%Y-%m-%d', date: '$Date' } },
+            category: '$CategoryID'
+          },
           count: { $sum: 1 }
         }
       },
-      { $sort: { '_id': 1 } }
-    ]).exec().then(results => results);
+      {
+        $lookup: {
+          from: 'categories',
+          localField: '_id.category',
+          foreignField: '_id',
+          as: 'category'
+        }
+      },
+      { $unwind: '$category' },
+      {
+        $project: {
+          date: '$_id.date',
+          categoryId: '$_id.category',
+          categoryName: '$category.Name',
+          count: 1
+        }
+      },
+      { $sort: { 'date': 1 } }
+    ]).exec();
+
+    // Transform the raw data into a format suitable for Chart.js
+    const dates = [...new Set(dailyEventsByCategoryRaw.map(e => e.date))].sort();
+    const categories = [...new Set(dailyEventsByCategoryRaw.map(e => e.categoryName))];
+
+    // Create datasets for each category
+    const dailyEventsByCategory = categories.map((category, index) => {
+      const data = dates.map(date => {
+        const entry = dailyEventsByCategoryRaw.find(e => e.date === date && e.categoryName === category);
+        return entry ? entry.count : 0;
+      });
+      return {
+        label: category,
+        data: data,
+        fill: false,
+        borderColor: ['#1cc88a', '#4e73df', '#36b9cc', '#f6c23e', '#e74a3b', '#858796'][index % 6],
+        tension: 0.1
+      };
+    });
+
+    // Calculate the maximum value for the Y-axis
+    const maxEventCount = Math.max(...dailyEventsByCategory.flatMap(dataset => dataset.data));
+    const yAxisMax = Math.ceil(maxEventCount * 1.2); // Add 20% padding above the max value
+
+    // Debug logs
+    console.log('dailyEventsByCategoryRaw:', dailyEventsByCategoryRaw);
+    console.log('dates:', dates);
+    console.log('categories:', categories);
+    console.log('dailyEventsByCategory:', dailyEventsByCategory);
+    console.log('maxEventCount:', maxEventCount);
+    console.log('yAxisMax:', yAxisMax);
 
     let selectedCompany = null;
     if (selectedCompanyID) {
       selectedCompany = await Company.findById(selectedCompanyID).lean();
     }
 
+    // Pass yAxisMax to the template
     res.render('admin', {
       title: 'Dashboard - SB Admin',
       user: user,
@@ -294,7 +355,9 @@ app.get('/admin', async (req, res) => {
       eventTypeEvents,
       objectsWithEvents,
       barChartData,
-      dailyEvents
+      dates,
+      dailyEventsByCategory,
+      yAxisMax // Add yAxisMax to the template data
     });
   } catch (error) {
     console.error('Error loading dashboard:', error);
@@ -1083,4 +1146,4 @@ app.use('/api', eventRoutes);
 
 // Start server
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));f

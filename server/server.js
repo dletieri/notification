@@ -7,9 +7,9 @@ const MongoDBStore = require('connect-mongodb-session')(session);
 const path = require('path');
 const eventRoutes = require('./routes/eventRoutes');
 const QRCode = require('qrcode');
-
+const https = require('https');
 const app = express();
-
+const fs = require('fs');
 // Import models
 const Company = require('./models/Company');
 const User = require('./models/User');
@@ -1151,6 +1151,16 @@ app.post('/admin/companies/add', async (req, res) => {
 
 app.use('/api', eventRoutes);
 
+// Configuração do certificado autoassinado
+const options = {
+  key: fs.readFileSync(process.env.SSL_KEY),
+  cert: fs.readFileSync(process.env.SSL_CERT)
+};
+
 // Start server
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));
+//app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));
+
+https.createServer(options, app).listen(3000, () => {
+  console.log('Servidor rodando em HTTPS na porta 3000');
+});

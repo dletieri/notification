@@ -155,11 +155,11 @@ app.get('/thanks', (req, res) => {
 
 // GET /admin - Render the dashboard
 app.get('/admin', async (req, res) => {
-  if (!req.session.user) return res.redirect('/admin/login');
+  if (!req.session.user) return res.status(401).redirect('/admin/login');
   if (!req.session.user.IsAdmin) return res.status(403).send('Access denied: Admins only');
 
   const user = await User.findById(req.session.user._id).populate('Companies').lean();
-  if (!user) return res.redirect('/admin/login');
+  if (!user) return res.status(401).redirect('/admin/login');
 
   const selectedCompanyID = req.session.selectedCompanyID || user.DefaultCompanyID;
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
@@ -382,7 +382,7 @@ app.post('/admin/login', async (req, res) => {
     res.redirect('/admin');
   } else {
     console.log('Login failed, error:', 'Invalid email or password');
-    res.render('login', { title: 'Login - SB Admin', error: 'Invalid email or password' });
+    res.status(401).render('login', { title: 'Login - SB Admin', error: 'Invalid email or password' });
   }
 });
 
@@ -400,7 +400,7 @@ app.get('/admin/companies', async (req, res) => {
 
   // Populate user.Companies with full company objects
   const user = await User.findById(req.session.user._id).populate('Companies').lean();
-  if (!user) return res.redirect('/admin/login');
+  if (!user) return res.status(401).redirect('/admin/login');
 
   // Fetch the selected company
   let selectedCompany = null;
@@ -423,7 +423,7 @@ app.get('/admin/categories', async (req, res) => {
 
   // Populate user.Companies with full company objects
   const user = await User.findById(req.session.user._id).populate('Companies').lean();
-  if (!user) return res.redirect('/admin/login');
+  if (!user) return res.status(401).redirect('/admin/login');
 
   // Fetch the selected company
   let selectedCompany = null;
@@ -452,7 +452,7 @@ app.get('/admin/categories/edit/:id', async (req, res) => {
 
   // Populate user.Companies with full company objects
   const user = await User.findById(req.session.user._id).populate('Companies').lean();
-  if (!user) return res.redirect('/admin/login');
+  if (!user) return res.status(401).redirect('/admin/login');
 
   // Fetch the selected company
   let selectedCompany = null;
@@ -547,7 +547,7 @@ app.get('/admin/environment-objects', async (req, res) => {
   if (!req.session.user.IsAdmin) return res.status(403).send('Access denied: Admins only');
 
   const user = await User.findById(req.session.user._id).populate('Companies').lean();
-  if (!user) return res.redirect('/admin/login');
+  if (!user) return res.status(401).redirect('/admin/login');
 
   // Fetch environment objects for the selected company
   const envObjects = req.session.selectedCompanyID
@@ -577,7 +577,7 @@ app.get('/admin/environment-objects/edit/:id', async (req, res) => {
 
   // Populate user.Companies with full company objects
   const user = await User.findById(req.session.user._id).populate('Companies').lean();
-  if (!user) return res.redirect('/admin/login');
+  if (!user) return res.status(401).redirect('/admin/login');
 
   // Fetch the selected company
   let selectedCompany = null;
@@ -659,7 +659,7 @@ app.get('/admin/event-types', async (req, res) => {
 
   // Populate user.Companies with full company objects
   const user = await User.findById(req.session.user._id).populate('Companies').lean();
-  if (!user) return res.redirect('/admin/login');
+  if (!user) return res.status(401).redirect('/admin/login');
 
   // Fetch the selected company
   let selectedCompany = null;
@@ -695,7 +695,7 @@ app.get('/admin/event-types/edit/:id', async (req, res) => {
 
   // Populate user.Companies with full company objects
   const user = await User.findById(req.session.user._id).populate('Companies').lean();
-  if (!user) return res.redirect('/admin/login');
+  if (!user) return res.status(401).redirect('/admin/login');
 
   // Fetch the selected company
   let selectedCompany = null;
@@ -777,7 +777,7 @@ app.get('/admin/users', async (req, res) => {
   if (!req.session.user.IsAdmin) return res.status(403).send('Access denied: Admins only');
 
   const user = await User.findById(req.session.user._id).populate('Companies').lean();
-  if (!user) return res.redirect('/admin/login');
+  if (!user) return res.status(401).redirect('/admin/login');
 
   const users = req.session.selectedCompanyID && mongoose.Types.ObjectId.isValid(req.session.selectedCompanyID)
     ? await User.find({ Companies: req.session.selectedCompanyID })
@@ -808,7 +808,7 @@ app.get('/admin/users/edit/:id', async (req, res) => {
 
   // Populate user.Companies with full company objects
   const user = await User.findById(req.session.user._id).populate('Companies').lean();
-  if (!user) return res.redirect('/admin/login');
+  if (!user) return res.status(401).redirect('/admin/login');
 
   // Fetch all companies for the dropdown
   const companies = await Company.find().lean();
@@ -1128,6 +1128,7 @@ app.post('/admin/companies/edit/:id', async (req, res) => {
 app.post('/admin/companies/add', async (req, res) => {
   const { name, registrationNumber, address, phone, email } = req.body;
   try {
+    // Create a new company
     const company = new Company({
       Name: name,
       CompanyRegistrationNumber: registrationNumber,
@@ -1136,6 +1137,12 @@ app.post('/admin/companies/add', async (req, res) => {
       Email: email
     });
     await company.save();
+
+    // Update the current user to include the new company in their Companies array
+    await User.findByIdAndUpdate(req.session.user._id, {
+      $push: { Companies: company._id }
+    });
+
     res.redirect('/admin/companies');
   } catch (error) {
     res.status(500).send('Error creating company: ' + error.message);

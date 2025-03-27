@@ -32,6 +32,17 @@
                   <% }); %>
                 </select>
               </div>
+              <div class="form-group">
+                <label for="roleId">Role</label>
+                <select class="form-control" id="roleId" name="roleId">
+                  <option value="">None</option>
+                  <% roles.forEach(role => { %>
+                    <option value="<%= role._id %>" <%= !isNew && eventType.RoleID && role._id.toString() === eventType.RoleID.toString() ? 'selected' : '' %>>
+                      <%= role.Name %>
+                    </option>
+                  <% }); %>
+                </select>
+              </div>
               <button type="submit" class="btn btn-primary btn-user"><%= isNew ? 'Create Event Type' : 'Update Event Type' %></button>
               <a href="/admin/event-types" class="btn btn-secondary btn-user">Cancel</a>
             </form>

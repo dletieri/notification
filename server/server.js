@@ -19,6 +19,7 @@ const Event = require('./models/Event');
 const EventType = require('./models/EventType');
 const Notification = require('./models/Notification');
 const Submission = require('./models/Submission');
+const Role = require('./models/Role'); // Novo modelo Role
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
@@ -690,6 +691,7 @@ app.get('/admin/event-types', async (req, res) => {
   });
 });
 
+// GET /admin/event-types/edit/:id
 app.get('/admin/event-types/edit/:id', async (req, res) => {
   if (!req.session.user) return res.redirect('/admin/login');
 
@@ -709,12 +711,19 @@ app.get('/admin/event-types/edit/:id', async (req, res) => {
     categories = await Category.find({ CompanyID: req.session.selectedCompanyID }).lean();
   }
 
+  // Fetch roles for the dropdown (filtered by selected company)
+  let roles = [];
+  if (req.session.selectedCompanyID) {
+    roles = await Role.find({ CompanyID: req.session.selectedCompanyID }).lean();
+  }
+
   if (req.params.id === 'new') {
     res.render('event-type-edit', {
       title: 'Add Event Type - SB Admin',
       user: user,
       eventType: {},
       categories: categories,
+      roles: roles, // Passa os roles para o template
       currentPage: 'event-types',
       selectedCompanyID: req.session.selectedCompanyID || null,
       isAdmin: user.IsAdmin,
@@ -729,6 +738,7 @@ app.get('/admin/event-types/edit/:id', async (req, res) => {
       user: user,
       eventType: eventType,
       categories: categories,
+      roles: roles, // Passa os roles para o template
       currentPage: 'event-types',
       selectedCompanyID: req.session.selectedCompanyID || null,
       isAdmin: user.IsAdmin,
@@ -738,14 +748,16 @@ app.get('/admin/event-types/edit/:id', async (req, res) => {
   }
 });
 
+// POST /admin/event-types/edit/:id
 app.post('/admin/event-types/edit/:id', async (req, res) => {
-  const { name, description, companyId, categoryId } = req.body;
+  const { name, description, categoryId, roleId } = req.body; // Adiciona roleId
   try {
     const updateData = {
       Name: name,
       Description: description,
-      CompanyID: companyId || req.session.selectedCompanyID,
-      CategoryID: categoryId
+      CompanyID: req.session.selectedCompanyID, // Usa o CompanyID da sessão
+      CategoryID: categoryId,
+      RoleID: roleId || null // Adiciona o RoleID
     };
     const eventType = await EventType.findByIdAndUpdate(req.params.id, updateData, { new: true });
     if (!eventType) return res.status(404).send('Event Type not found');
@@ -755,14 +767,16 @@ app.post('/admin/event-types/edit/:id', async (req, res) => {
   }
 });
 
+// POST /admin/event-types/add
 app.post('/admin/event-types/add', async (req, res) => {
-  const { name, description, companyId, categoryId } = req.body;
+  const { name, description, categoryId, roleId } = req.body; // Adiciona roleId
   try {
     const eventType = new EventType({
       Name: name,
       Description: description,
-      CompanyID: companyId || req.session.selectedCompanyID,
-      CategoryID: categoryId
+      CompanyID: req.session.selectedCompanyID, // Usa o CompanyID da sessão
+      CategoryID: categoryId,
+      RoleID: roleId || null // Adiciona o RoleID
     });
     await eventType.save();
     res.redirect('/admin/event-types');
@@ -802,18 +816,20 @@ app.get('/admin/users', async (req, res) => {
   });
 });
 
+// GET /admin/users/edit/:id
 app.get('/admin/users/edit/:id', async (req, res) => {
   if (!req.session.user) return res.redirect('/admin/login');
   if (!req.session.user.IsAdmin) return res.status(403).send('Access denied: Admins only');
 
-  // Populate user.Companies with full company objects
   const user = await User.findById(req.session.user._id).populate('Companies').lean();
   if (!user) return res.status(401).redirect('/admin/login');
 
-  // Fetch all companies for the dropdown
   const companies = await Company.find().lean();
+  let roles = [];
+  if (req.session.selectedCompanyID) {
+    roles = await Role.find({ CompanyID: req.session.selectedCompanyID }).lean(); // Filtra roles pela empresa da sessão
+  }
 
-  // Fetch the selected company
   let selectedCompany = null;
   if (req.session.selectedCompanyID) {
     selectedCompany = await Company.findById(req.session.selectedCompanyID).lean();
@@ -825,6 +841,7 @@ app.get('/admin/users/edit/:id', async (req, res) => {
       user: user,
       editUser: {},
       companies: companies,
+      roles: roles, // Passa os roles para o template
       currentPage: 'users',
       selectedCompanyID: req.session.selectedCompanyID || null,
       isAdmin: user.IsAdmin,
@@ -833,13 +850,14 @@ app.get('/admin/users/edit/:id', async (req, res) => {
       error: null
     });
   } else {
-    const editUser = await User.findById(req.params.id).populate('Companies', 'Name').lean();
+    const editUser = await User.findById(req.params.id).populate('Companies', 'Name').populate('Roles', 'Name').lean();
     if (!editUser) return res.status(404).send('User not found');
     res.render('user-edit', {
       title: 'Edit User - SB Admin',
       user: user,
       editUser: editUser,
       companies: companies,
+      roles: roles, // Passa os roles para o template
       currentPage: 'users',
       selectedCompanyID: req.session.selectedCompanyID || null,
       isAdmin: user.IsAdmin,
@@ -850,17 +868,18 @@ app.get('/admin/users/edit/:id', async (req, res) => {
   }
 });
 
+// POST /admin/users/edit/:id
 app.post('/admin/users/edit/:id', async (req, res) => {
   if (!req.session.user.IsAdmin) return res.status(403).send('Access denied: Admins only');
 
-  const { email, name, role, isAdmin, defaultCompanyID, companies } = req.body;
+  const { email, name, phone, role, isAdmin, defaultCompanyID, companies, roles } = req.body; // Adiciona roles
 
   try {
-    // Validate email uniqueness (excluding the current user)
     const existingUser = await User.findOne({ Email: email, _id: { $ne: req.params.id } });
     if (existingUser) {
       const user = await User.findById(req.session.user._id).populate('Companies').lean();
       const companiesList = await Company.find().lean();
+      const rolesList = await Role.find({ CompanyID: req.session.selectedCompanyID }).lean();
       let selectedCompany = null;
       if (req.session.selectedCompanyID) {
         selectedCompany = await Company.findById(req.session.selectedCompanyID).lean();
@@ -868,8 +887,9 @@ app.post('/admin/users/edit/:id', async (req, res) => {
       return res.render('user-edit', {
         title: 'Edit User - SB Admin',
         user: user,
-        editUser: { Email: email, Name: name, Role: role, IsAdmin: isAdmin === 'on', DefaultCompanyID: defaultCompanyID, Companies: companies },
+        editUser: { Email: email, Name: name, Phone: phone, Role: role, IsAdmin: isAdmin === 'on', DefaultCompanyID: defaultCompanyID, Companies: companies, Roles: roles },
         companies: companiesList,
+        roles: rolesList,
         currentPage: 'users',
         selectedCompanyID: req.session.selectedCompanyID || null,
         isAdmin: user.IsAdmin,
@@ -882,10 +902,12 @@ app.post('/admin/users/edit/:id', async (req, res) => {
     const updateData = {
       Email: email,
       Name: name,
-      Role: role || '',
+      Phone: phone,
+      Role: role || '', // Pode ser removido se não for mais necessário
       IsAdmin: isAdmin === 'on',
       DefaultCompanyID: defaultCompanyID ? new mongoose.Types.ObjectId(defaultCompanyID) : null,
-      Companies: companies ? (Array.isArray(companies) ? companies : [companies]).map(id => new mongoose.Types.ObjectId(id)) : []
+      Companies: companies ? (Array.isArray(companies) ? companies : [companies]).map(id => new mongoose.Types.ObjectId(id)) : [],
+      Roles: roles ? (Array.isArray(roles) ? roles : [roles]).map(id => new mongoose.Types.ObjectId(id)) : [] // Adiciona o array de Roles
     };
     const updatedUser = await User.findByIdAndUpdate(req.params.id, updateData, { new: true, runValidators: true });
     if (!updatedUser) return res.status(404).send('User not found');
@@ -893,6 +915,7 @@ app.post('/admin/users/edit/:id', async (req, res) => {
   } catch (error) {
     const user = await User.findById(req.session.user._id).populate('Companies').lean();
     const companiesList = await Company.find().lean();
+    const rolesList = await Role.find({ CompanyID: req.session.selectedCompanyID }).lean();
     let selectedCompany = null;
     if (req.session.selectedCompanyID) {
       selectedCompany = await Company.findById(req.session.selectedCompanyID).lean();
@@ -900,8 +923,9 @@ app.post('/admin/users/edit/:id', async (req, res) => {
     res.render('user-edit', {
       title: 'Edit User - SB Admin',
       user: user,
-      editUser: { Email: email, Name: name, Role: role, IsAdmin: isAdmin === 'on', DefaultCompanyID: defaultCompanyID, Companies: companies },
+      editUser: { Email: email, Name: name, Phone: phone, Role: role, IsAdmin: isAdmin === 'on', DefaultCompanyID: defaultCompanyID, Companies: companies, Roles: roles },
       companies: companiesList,
+      roles: rolesList,
       currentPage: 'users',
       selectedCompanyID: req.session.selectedCompanyID || null,
       isAdmin: user.IsAdmin,
@@ -912,17 +936,18 @@ app.post('/admin/users/edit/:id', async (req, res) => {
   }
 });
 
+// POST /admin/users/add
 app.post('/admin/users/add', async (req, res) => {
   if (!req.session.user.IsAdmin) return res.status(403).send('Access denied: Admins only');
 
-  const { email, password, name, role, isAdmin, defaultCompanyID, companies } = req.body;
+  const { email, password, name, phone, role, isAdmin, defaultCompanyID, companies, roles } = req.body; // Adiciona roles
 
   try {
-    // Validate email uniqueness
     const existingUser = await User.findOne({ Email: email });
     if (existingUser) {
       const user = await User.findById(req.session.user._id).populate('Companies').lean();
       const companiesList = await Company.find().lean();
+      const rolesList = await Role.find({ CompanyID: req.session.selectedCompanyID }).lean();
       let selectedCompany = null;
       if (req.session.selectedCompanyID) {
         selectedCompany = await Company.findById(req.session.selectedCompanyID).lean();
@@ -930,8 +955,9 @@ app.post('/admin/users/add', async (req, res) => {
       return res.render('user-edit', {
         title: 'Add User - SB Admin',
         user: user,
-        editUser: { Email: email, Name: name, Role: role, IsAdmin: isAdmin === 'on', DefaultCompanyID: defaultCompanyID, Companies: companies },
+        editUser: { Email: email, Name: name, Phone: phone, Role: role, IsAdmin: isAdmin === 'on', DefaultCompanyID: defaultCompanyID, Companies: companies, Roles: roles },
         companies: companiesList,
+        roles: rolesList,
         currentPage: 'users',
         selectedCompanyID: req.session.selectedCompanyID || null,
         isAdmin: user.IsAdmin,
@@ -945,10 +971,12 @@ app.post('/admin/users/add', async (req, res) => {
       Email: email,
       Password: password, // Note: Should be hashed with bcrypt in a real app
       Name: name,
-      Role: role || '',
+      Phone: phone,
+      Role: role || '', // Pode ser removido se não for mais necessário
       IsAdmin: isAdmin === 'on',
       DefaultCompanyID: defaultCompanyID ? new mongoose.Types.ObjectId(defaultCompanyID) : null,
       Companies: companies ? (Array.isArray(companies) ? companies : [companies]).map(id => new mongoose.Types.ObjectId(id)) : [],
+      Roles: roles ? (Array.isArray(roles) ? roles : [roles]).map(id => new mongoose.Types.ObjectId(id)) : [], // Adiciona o array de Roles
       RegistrationDate: new Date()
     });
     await newUser.save();
@@ -956,6 +984,7 @@ app.post('/admin/users/add', async (req, res) => {
   } catch (error) {
     const user = await User.findById(req.session.user._id).populate('Companies').lean();
     const companiesList = await Company.find().lean();
+    const rolesList = await Role.find({ CompanyID: req.session.selectedCompanyID }).lean();
     let selectedCompany = null;
     if (req.session.selectedCompanyID) {
       selectedCompany = await Company.findById(req.session.selectedCompanyID).lean();
@@ -963,8 +992,9 @@ app.post('/admin/users/add', async (req, res) => {
     res.render('user-edit', {
       title: 'Add User - SB Admin',
       user: user,
-      editUser: { Email: email, Name: name, Role: role, IsAdmin: isAdmin === 'on', DefaultCompanyID: defaultCompanyID, Companies: companies },
+      editUser: { Email: email, Name: name, Phone: phone, Role: role, IsAdmin: isAdmin === 'on', DefaultCompanyID: defaultCompanyID, Companies: companies, Roles: roles },
       companies: companiesList,
+      roles: rolesList,
       currentPage: 'users',
       selectedCompanyID: req.session.selectedCompanyID || null,
       isAdmin: user.IsAdmin,
@@ -988,6 +1018,162 @@ app.post('/admin/users/delete/:id', async (req, res) => {
     }
   } catch (error) {
     res.status(500).send('Error deleting user: ' + error.message);
+  }
+});
+
+// GET /admin/roles - List all roles
+app.get('/admin/roles', async (req, res) => {
+  if (!req.session.user) return res.redirect('/admin/login');
+  if (!req.session.user.IsAdmin) return res.status(403).send('Access denied: Admins only');
+
+  const user = await User.findById(req.session.user._id).populate('Companies').lean();
+  if (!user) return res.status(401).redirect('/admin/login');
+
+  let roles = [];
+  if (req.session.selectedCompanyID && mongoose.Types.ObjectId.isValid(req.session.selectedCompanyID)) {
+    roles = await Role.find({ CompanyID: req.session.selectedCompanyID })
+      .populate('CompanyID', 'Name')
+      .lean();
+  }
+
+  let selectedCompany = null;
+  if (req.session.selectedCompanyID) {
+    selectedCompany = await Company.findById(req.session.selectedCompanyID).lean();
+  }
+
+  res.render('roles', {
+    title: 'Roles - SB Admin',
+    user: user,
+    roles: roles,
+    currentPage: 'roles',
+    selectedCompanyID: req.session.selectedCompanyID || null,
+    isAdmin: user.IsAdmin,
+    selectedCompany: selectedCompany
+  });
+});
+
+// GET /admin/roles/edit/:id - Render role edit form
+app.get('/admin/roles/edit/:id', async (req, res) => {
+  if (!req.session.user) return res.redirect('/admin/login');
+  if (!req.session.user.IsAdmin) return res.status(403).send('Access denied: Admins only');
+
+  const user = await User.findById(req.session.user._id).populate('Companies').lean();
+  if (!user) return res.status(401).redirect('/admin/login');
+
+  let selectedCompany = null;
+  if (req.session.selectedCompanyID) {
+    selectedCompany = await Company.findById(req.session.selectedCompanyID).lean();
+  }
+
+  if (req.params.id === 'new') {
+    res.render('role-edit', {
+      title: 'Add Role - SB Admin',
+      user: user,
+      role: {},
+      currentPage: 'roles',
+      selectedCompanyID: req.session.selectedCompanyID || null,
+      isAdmin: user.IsAdmin,
+      isNew: true,
+      selectedCompany: selectedCompany,
+      error: null
+    });
+  } else {
+    const role = await Role.findById(req.params.id).populate('CompanyID', 'Name').lean();
+    if (!role) return res.status(404).send('Role not found');
+    res.render('role-edit', {
+      title: 'Edit Role - SB Admin',
+      user: user,
+      role: role,
+      currentPage: 'roles',
+      selectedCompanyID: req.session.selectedCompanyID || null,
+      isAdmin: user.IsAdmin,
+      isNew: false,
+      selectedCompany: selectedCompany,
+      error: null
+    });
+  }
+});
+
+// POST /admin/roles/edit/:id - Update an existing role
+app.post('/admin/roles/edit/:id', async (req, res) => {
+  if (!req.session.user.IsAdmin) return res.status(403).send('Access denied: Admins only');
+
+  const { name, description } = req.body;
+
+  try {
+    const updateData = {
+      Name: name,
+      Description: description || '',
+      CompanyID: req.session.selectedCompanyID ? new mongoose.Types.ObjectId(req.session.selectedCompanyID) : null
+    };
+    const updatedRole = await Role.findByIdAndUpdate(req.params.id, updateData, { new: true, runValidators: true });
+    if (!updatedRole) return res.status(404).send('Role not found');
+    res.redirect('/admin/roles');
+  } catch (error) {
+    const user = await User.findById(req.session.user._id).populate('Companies').lean();
+    let selectedCompany = null;
+    if (req.session.selectedCompanyID) {
+      selectedCompany = await Company.findById(req.session.selectedCompanyID).lean();
+    }
+    res.render('role-edit', {
+      title: 'Edit Role - SB Admin',
+      user: user,
+      role: { Name: name, Description: description, CompanyID: req.session.selectedCompanyID },
+      currentPage: 'roles',
+      selectedCompanyID: req.session.selectedCompanyID || null,
+      isAdmin: user.IsAdmin,
+      isNew: false,
+      selectedCompany: selectedCompany,
+      error: 'Error updating role: ' + error.message
+    });
+  }
+});
+
+// POST /admin/roles/add - Create a new role
+app.post('/admin/roles/add', async (req, res) => {
+  if (!req.session.user.IsAdmin) return res.status(403).send('Access denied: Admins only');
+
+  const { name, description } = req.body;
+
+  try {
+    const newRole = new Role({
+      Name: name,
+      Description: description || '',
+      CompanyID: req.session.selectedCompanyID ? new mongoose.Types.ObjectId(req.session.selectedCompanyID) : null,
+      CreatedAt: new Date()
+    });
+    await newRole.save();
+    res.redirect('/admin/roles');
+  } catch (error) {
+    const user = await User.findById(req.session.user._id).populate('Companies').lean();
+    let selectedCompany = null;
+    if (req.session.selectedCompanyID) {
+      selectedCompany = await Company.findById(req.session.selectedCompanyID).lean();
+    }
+    res.render('role-edit', {
+      title: 'Add Role - SB Admin',
+      user: user,
+      role: { Name: name, Description: description, CompanyID: req.session.selectedCompanyID },
+      currentPage: 'roles',
+      selectedCompanyID: req.session.selectedCompanyID || null,
+      isAdmin: user.IsAdmin,
+      isNew: true,
+      selectedCompany: selectedCompany,
+      error: 'Error creating role: ' + error.message
+    });
+  }
+});
+
+// POST /admin/roles/delete/:id - Delete a role
+app.post('/admin/roles/delete/:id', async (req, res) => {
+  if (!req.session.user.IsAdmin) return res.status(403).send('Access denied: Admins only');
+
+  try {
+    const role = await Role.findByIdAndDelete(req.params.id);
+    if (!role) return res.status(404).send('Role not found');
+    res.redirect('/admin/roles');
+  } catch (error) {
+    res.status(500).send('Error deleting role: ' + error.message);
   }
 });
 
@@ -1159,8 +1345,6 @@ const options = {
 
 // Start server
 const PORT = process.env.PORT || 3000;
-//app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));
-
 https.createServer(options, app).listen(3000, () => {
   console.log('Servidor rodando em HTTPS na porta 3000');
 });

@@ -31,6 +31,7 @@
                   <% users.forEach(user => { %>
                     <tr>
                       <td><%= user.Email %></td>
+                      <td><%= user.Phone || 'N/A' %></td> <!-- Exibir telefone ou 'N/A' se não existir -->
                       <td><%= user.Name %></td>
                       <td><%= user.Role || 'N/A' %></td>
                       <td><%= user.IsAdmin ? 'Yes' : 'No' %></td>

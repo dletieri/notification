@@ -1,0 +1,36 @@
+<%- include('partials/header', { title: title }) %>
+<div id="wrapper">
+  <%- include('partials/sidebar', { currentPage: currentPage }) %>
+  <div id="content-wrapper" class="d-flex flex-column">
+    <div id="content">
+      <%- include('partials/topbar', { user: user, selectedCompany: selectedCompany }) %>
+      <div class="container-fluid">
+        <h1 class="h3 mb-4 text-gray-800"><%= isNew ? 'Add Role' : 'Edit Role' %></h1>
+        <div class="card shadow mb-4">
+          <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary"><%= isNew ? 'Add Role Details' : 'Edit Role Details' %></h6>
+          </div>
+          <div class="card-body">
+            <% if (error) { %>
+              <div class="alert alert-danger"><%= error %></div>
+            <% } %>
+            <form method="POST" action="<%= isNew ? '/admin/roles/add' : '/admin/roles/edit/' + role._id %>" class="role">
+              <div class="form-group">
+                <label for="name">Name</label>
+                <input type="text" class="form-control" id="name" name="name" value="<%= isNew ? '' : role.Name %>" placeholder="Enter Role Name" required>
+              </div>
+              <div class="form-group">
+                <label for="description">Description</label>
+                <input type="text" class="form-control" id="description" name="description" value="<%= isNew ? '' : role.Description || '' %>" placeholder="Enter Description (optional)">
+              </div>
+              <button type="submit" class="btn btn-primary btn-user"><%= isNew ? 'Create Role' : 'Update Role' %></button>
+              <a href="/admin/roles" class="btn btn-secondary btn-user">Cancel</a>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+    <%- include('partials/footer') %>
+  </div>
+</div>
+<%- include('partials/scripts') %>

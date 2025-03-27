@@ -30,8 +30,8 @@
                 <input type="text" class="form-control" id="name" name="name" value="<%= isNew ? '' : editUser.Name %>" placeholder="Enter Name" required>
               </div>
               <div class="form-group">
-                <label for="role">Role</label>
-                <input type="text" class="form-control" id="role" name="role" value="<%= isNew ? '' : editUser.Role %>" placeholder="Enter Role (optional)">
+                <label for="phone">Phone</label>
+                <input type="text" class="form-control" id="phone" name="phone" value="<%= isNew ? '' : editUser.Phone || '' %>" placeholder="Enter Phone (optional)">
               </div>
               <div class="form-group">
                 <label for="isAdmin">Admin</label>
@@ -59,6 +59,21 @@
                               ? 'selected' : '' 
                             %>>
                       <%= company.Name %>
+                    </option>
+                  <% }); %>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="roles">Roles</label>
+                <select class="form-control" id="roles" name="roles" multiple>
+                  <% roles.forEach(role => { %>
+                    <option value="<%= role._id %>" 
+                            <%= 
+                              (editUser.Roles && Array.isArray(editUser.Roles) && editUser.Roles.some(r => r._id && r._id.toString() === role._id.toString())) || 
+                              (!isNew && editUser._id && editUser.Roles && editUser.Roles.includes(role._id.toString())) 
+                              ? 'selected' : '' 
+                            %>>
+                      <%= role.Name %>
                     </option>
                   <% }); %>
                 </select>

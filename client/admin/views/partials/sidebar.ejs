@@ -41,6 +41,14 @@
     </a>
   </li>
 
+  <!-- Nav Item - Roles -->
+  <li class="nav-item <%= currentPage === 'roles' ? 'active' : '' %>">
+    <a class="nav-link" href="/admin/roles">
+      <i class="fas fa-fw fa-user-tag"></i>
+      <span>Roles</span>
+    </a>
+  </li>
+
   <!-- Nav Item - Categories -->
   <li class="nav-item <%= currentPage === 'categories' ? 'active' : '' %>">
     <a class="nav-link" href="/admin/categories">
@@ -57,7 +65,6 @@
     </a>
   </li>
 
-
   <!-- Nav Item - Environment Objects -->
   <li class="nav-item <%= currentPage === 'environment-objects' ? 'active' : '' %>">
     <a class="nav-link" href="/admin/environment-objects">
@@ -65,7 +72,6 @@
       <span>Environment Objects</span>
     </a>
   </li>
-
 
   <!-- Nav Item - Events -->
   <!-- li class="nav-item <%= currentPage === 'events' ? 'active' : '' %>">

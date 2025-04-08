@@ -4,6 +4,8 @@ const express = require('express');
 const mongoose = require('mongoose');
 const session = require('express-session');
 const MongoDBStore = require('connect-mongodb-session')(session);
+const bcrypt = require('bcrypt');
+
 const path = require('path');
 const eventRoutes = require('./routes/eventRoutes');
 const QRCode = require('qrcode');
@@ -1334,6 +1336,102 @@ app.post('/admin/companies/add', async (req, res) => {
     res.status(500).send('Error creating company: ' + error.message);
   }
 });
+
+
+
+// GET /signup - Render the signup page
+app.get('/signup', (req, res) => {
+  res.render('signup', {
+    title: 'Register',
+    error: null // No error initially
+  });
+});
+
+// POST /signup - Handle user and company registration
+app.post('/signup', async (req, res) => {
+  const {
+    userName,
+    userEmail,
+    userPassword,
+    userConfirmPassword,
+    userPhone,
+    companyName,
+    companyRegistrationNumber,
+    companyAddress,
+    companyPhone,
+    companyEmail
+  } = req.body;
+
+  // Validate required fields
+  if (!userName || !userEmail || !userPassword || !userConfirmPassword || !companyName) {
+    return res.render('signup', {
+      title: 'Register',
+      error: 'All required fields must be filled'
+    });
+  }
+
+  // Validate password match
+  if (userPassword !== userConfirmPassword) {
+    return res.render('signup', {
+      title: 'Register',
+      error: 'Passwords do not match'
+    });
+  }
+
+  try {
+    // Check if user email already exists
+    const existingUser = await User.findOne({ Email: userEmail }).lean();
+    if (existingUser) {
+      return res.render('signup', {
+        title: 'Register',
+        error: 'Email is already registered'
+      });
+    }
+
+    // Hash the password
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(userPassword, saltRounds);
+
+    // Create new Company
+    const newCompany = new Company({
+      Name: companyName,
+      CompanyRegistrationNumber: companyRegistrationNumber || null,
+      Address: companyAddress || null,
+      Phone: companyPhone || null,
+      Email: companyEmail || null
+    });
+
+    const savedCompany = await newCompany.save();
+
+    // Create new User with reference to Company (assuming you might want to link them later)
+    const newUser = new User({
+      Email: userEmail,
+      Password: hashedPassword,
+      Name: userName,
+      Phone: userPhone || null
+      // You could add a CompanyID field here if you want to link User to Company
+      // CompanyID: savedCompany._id
+    });
+
+    await newUser.save();
+
+    // Redirect to a thank you page or login page
+    res.redirect('/admin/login?signup=success');
+  } catch (error) {
+    console.error('Error during registration:', error);
+    res.render('signup', {
+      title: 'Register',
+      error: 'Error during registration: ' + error.message
+    });
+  }
+});
+
+
+
+
+
+
+
 
 app.use('/api', eventRoutes);
 

@@ -19,6 +19,7 @@
                   <tr>
                     <th>Name</th>
                     <th>Description</th>
+                    <th>Attend</th> <!-- New column -->
                     <th>Company</th>
                     <th>Category</th>
                     <th>Actions</th>
@@ -69,6 +70,7 @@
               <tr>
                 <td>${type.Name || 'N/A'}</td>
                 <td>${type.Description || ''}</td>
+                <td>${type.attend || ''}</td> <!-- New column data -->
                 <td>${type.CompanyName || 'N/A'}</td>
                 <td>${type.CategoryName || 'N/A'}</td>
                 <td>
@@ -84,7 +86,7 @@
         }
       }).fail(function(xhr) {
         console.error('Error loading event types:', xhr.status, xhr.responseText);
-        $('#eventTypesTableBody').html('<tr><td colspan="5">Error loading event types: ' + (xhr.responseText || 'Unknown error') + '</td></tr>');
+        $('#eventTypesTableBody').html('<tr><td colspan="6">Error loading event types: ' + (xhr.responseText || 'Unknown error') + '</td></tr>');
       });
     }
 

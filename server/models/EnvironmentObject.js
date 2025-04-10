@@ -9,7 +9,8 @@ const environmentObjectSchema = new mongoose.Schema({
   QRCode: String,
   Status: { type: String, enum: ['Active', 'Inactive', 'Under Maintenance'], default: 'Active' },
   LastEventDate: Date,
-  RegistrationDate: { type: Date, default: Date.now }
+  RegistrationDate: { type: Date, default: Date.now },
+  isPrivate: { type: Boolean, default: false } // Add this field
 });
 
 module.exports = mongoose.model('EnvironmentObject', environmentObjectSchema);

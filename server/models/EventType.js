@@ -5,7 +5,8 @@ const eventTypeSchema = new mongoose.Schema({
   CategoryID: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', required: true },
   Name: { type: String, required: true },
   RoleID: { type: mongoose.Schema.Types.ObjectId, ref: 'Role', required: false }, // Novo campo
-  Description: String
+  Description: String,
+  attend: { type: String } // New text field
   // Form field is ignored as per request
 });
 

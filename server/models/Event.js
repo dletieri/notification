@@ -8,7 +8,8 @@ const eventSchema = new mongoose.Schema({
   UserID: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // Removed required: true
   Date: { type: Date, required: true },
   Details: Object,
-  SubmissionID: { type: mongoose.Schema.Types.ObjectId, ref: 'Submission' }
+  SubmissionID: { type: mongoose.Schema.Types.ObjectId, ref: 'Submission' },
+  isAttend: { type: Boolean, default: false } // Add this field
 });
 
 module.exports = mongoose.model('Event', eventSchema);

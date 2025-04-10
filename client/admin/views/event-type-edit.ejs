@@ -43,6 +43,11 @@
                   <% }); %>
                 </select>
               </div>
+              <!-- New attend field -->
+              <div class="form-group">
+                <label for="attend">Attend</label>
+                <input type="text" class="form-control" id="attend" name="attend" value="<%= isNew ? '' : (eventType.attend || '') %>" placeholder="Attend Details">
+              </div>
               <button type="submit" class="btn btn-primary btn-user"><%= isNew ? 'Create Event Type' : 'Update Event Type' %></button>
               <a href="/admin/event-types" class="btn btn-secondary btn-user">Cancel</a>
             </form>

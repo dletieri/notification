@@ -53,18 +53,17 @@ app.use(session({
   cookie: { maxAge: 1000 * 60 * 60 } // 1 hour
 }));
 
-// Routes
-// GET / - Render the event report page
+// GET /report-event
+// GET /
 app.get('/', async (req, res) => {
   const objID = req.query.objID;
+  const isAttend = req.query.isAttend;
 
-  // Validate objID format
   if (!objID || !mongoose.Types.ObjectId.isValid(objID)) {
     return res.status(400).send('Invalid or missing objID');
   }
 
   try {
-    // Fetch the EnvironmentObject with populated Company
     const environmentObject = await EnvironmentObject.findById(objID)
       .populate('CompanyID', 'Name')
       .lean();
@@ -72,13 +71,11 @@ app.get('/', async (req, res) => {
       return res.status(404).send('Environment Object not found');
     }
 
-    // Get the CategoryID from the EnvironmentObject
     const categoryID = environmentObject.CategoryID;
     if (!categoryID) {
       return res.status(400).send('Environment Object has no associated category');
     }
 
-    // Fetch EventTypes that match both the CompanyID and CategoryID
     const eventTypes = await EventType.find({
       CompanyID: environmentObject.CompanyID._id,
       CategoryID: categoryID
@@ -86,17 +83,57 @@ app.get('/', async (req, res) => {
       .populate('CategoryID', 'Name')
       .lean();
 
-    // If no event types found, show an error
     if (!eventTypes || eventTypes.length === 0) {
       return res.status(400).send('No event types available for this category');
     }
 
+    const user = req.session.user; // Get logged-in user from session
+
+    // Case 1: isAttend is true
+    if (isAttend === 'true') {
+      if (!user) {
+        // Redirect to login if no user is logged in
+        return res.redirect('/admin/login?returnTo=' + encodeURIComponent(req.originalUrl));
+      }
+
+      // Check if user has a role matching any eventType.RoleID
+      const allowedRoleIds = eventTypes
+        .filter(et => et.RoleID)
+        .map(et => et.RoleID.toString());
+      const userRoleIds = user.Roles.map(r => r.toString());
+      const hasRequiredRole = allowedRoleIds.some(roleId => userRoleIds.includes(roleId));
+
+      if (!hasRequiredRole) {
+        return res.status(403).send('You do not have permission to report this event type');
+      }
+
+      // Render the page for authorized users
+      return res.render('report-event', {
+        title: 'Report Event',
+        environmentObject,
+        eventTypes,
+        isAttend,
+        user,
+        requiresLogin: false
+      });
+    }
+
+    // Case 2: isAttend is not true
+    if (environmentObject.isPrivate === true) {
+      if (!user) {
+        // Redirect to login if no user is logged in and object is private
+        return res.redirect('/admin/login?returnTo=' + encodeURIComponent(req.originalUrl));
+      }
+    }
+
+    // Render the page (either logged in or public)
     res.render('report-event', {
       title: 'Report Event',
       environmentObject,
       eventTypes,
-      selectedCompanyID: null,
-      isAdmin: false
+      isAttend,
+      user,
+      requiresLogin: environmentObject.isPrivate && !user
     });
   } catch (error) {
     console.error('Error loading event report page:', error);
@@ -104,40 +141,54 @@ app.get('/', async (req, res) => {
   }
 });
 
-// POST /report-event - Handle event submission
-app.post('/report-event', async (req, res) => {
-  const { objID, eventTypeID } = req.body;
+// POST /
+app.post('/', async (req, res) => {
+  const { objID, eventTypeID, isAttend } = req.body;
 
-  // Validate required fields
   if (!objID || !eventTypeID || !mongoose.Types.ObjectId.isValid(objID) || !mongoose.Types.ObjectId.isValid(eventTypeID)) {
     return res.status(400).send('Invalid or missing required fields');
   }
 
   try {
-    // Fetch the EnvironmentObject to get CompanyID
     const environmentObject = await EnvironmentObject.findById(objID).lean();
     if (!environmentObject) {
       return res.status(404).send('Environment Object not found');
     }
 
-    // Fetch the EventType to get CategoryID
     const eventType = await EventType.findById(eventTypeID).lean();
     if (!eventType) {
       return res.status(404).send('Event Type not found');
     }
 
-    // Create the new Event (no UserID or Details for now)
+    const user = req.session.user;
+
+    // Validation based on isAttend and isPrivate
+    if (isAttend === 'true') {
+      if (!user) {
+        return res.status(401).send('Login required to report this event');
+      }
+      const allowedRoleIds = [eventType.RoleID?.toString()].filter(Boolean);
+      const userRoleIds = user.Roles.map(r => r.toString());
+      const hasRequiredRole = allowedRoleIds.some(roleId => userRoleIds.includes(roleId));
+      if (!hasRequiredRole) {
+        return res.status(403).send('You do not have permission to report this event type');
+      }
+    } else if (environmentObject.isPrivate === true && !user) {
+      return res.status(401).send('Login required to report this event');
+    }
+
     const newEvent = new Event({
       CompanyID: environmentObject.CompanyID,
       CategoryID: eventType.CategoryID,
       EventTypeID: new mongoose.Types.ObjectId(eventTypeID),
       EnvironmentObjectID: new mongoose.Types.ObjectId(objID),
-      Date: new Date()
-      // UserID and Details are omitted as requested
+      Date: new Date(),
+      isAttend: isAttend === 'true',
+      UserID: user ? new mongoose.Types.ObjectId(user._id) : null // Optional: Store user who reported
     });
 
     await newEvent.save();
-    res.redirect('/thanks?objID=' + objID); // Redirect to thank you page with objID
+    res.redirect('/thanks?objID=' + objID);
   } catch (error) {
     console.error('Error submitting event:', error);
     res.status(500).send('Error submitting event: ' + error.message);
@@ -371,21 +422,40 @@ app.get('/admin', async (req, res) => {
 app.get('/admin/login', (req, res) => {
   console.log('Rendering login page, error:', null);
   console.log('Session on login GET:', req.session);
-  res.render('login', { title: 'Login - SB Admin', error: null });
+  res.render('login', { title: 'Login - Notify.ME', 
+      error: null,
+      returnTo: req.query.returnTo || '' // Pass returnTo from query string
+   });
 });
-
 app.post('/admin/login', async (req, res) => {
   const { email, password } = req.body;
   console.log('Login attempt:', { email, password });
-  const user = await User.findOne({ Email: email });
-  if (user && user.Password === password) {
-    req.session.user = user;
-    req.session.selectedCompanyID = user.DefaultCompanyID;
-    console.log('Login successful, redirecting to /admin');
-    res.redirect('/admin');
-  } else {
-    console.log('Login failed, error:', 'Invalid email or password');
-    res.status(401).render('login', { title: 'Login - SB Admin', error: 'Invalid email or password' });
+
+  try {
+    const user = await User.findOne({ Email: email });
+    if (user && user.Password === password) {
+      req.session.user = user;
+      req.session.selectedCompanyID = user.DefaultCompanyID;
+      console.log('Login successful');
+
+      // Get the returnTo parameter from the query string (passed from the redirect)
+      const returnTo = req.query.returnTo || '/admin'; // Default to /admin if no returnTo is provided
+
+      console.log('Redirecting to (441):', returnTo);
+      res.redirect(returnTo);
+    } else {
+      console.log('Login failed, error:', 'Invalid email or password');
+      res.status(401).render('login', {
+        title: 'Login - SB Admin',
+        error: 'Invalid email or password'
+      });
+    }
+  } catch (error) {
+    console.error('Error during login:', error);
+    res.status(500).render('login', {
+      title: 'Login - Notify.ME',
+      error: 'An error occurred during login'
+    });
   }
 });
 
@@ -752,14 +822,15 @@ app.get('/admin/event-types/edit/:id', async (req, res) => {
 
 // POST /admin/event-types/edit/:id
 app.post('/admin/event-types/edit/:id', async (req, res) => {
-  const { name, description, categoryId, roleId } = req.body; // Adiciona roleId
+  const { name, description, categoryId, roleId, attend } = req.body; // Add attend
   try {
     const updateData = {
       Name: name,
       Description: description,
-      CompanyID: req.session.selectedCompanyID, // Usa o CompanyID da sessão
+      CompanyID: req.session.selectedCompanyID, // Uses session CompanyID
       CategoryID: categoryId,
-      RoleID: roleId || null // Adiciona o RoleID
+      RoleID: roleId || null,
+      attend // Add attend to update
     };
     const eventType = await EventType.findByIdAndUpdate(req.params.id, updateData, { new: true });
     if (!eventType) return res.status(404).send('Event Type not found');
@@ -771,14 +842,15 @@ app.post('/admin/event-types/edit/:id', async (req, res) => {
 
 // POST /admin/event-types/add
 app.post('/admin/event-types/add', async (req, res) => {
-  const { name, description, categoryId, roleId } = req.body; // Adiciona roleId
+  const { name, description, categoryId, roleId, attend } = req.body; // Add attend
   try {
     const eventType = new EventType({
       Name: name,
       Description: description,
-      CompanyID: req.session.selectedCompanyID, // Usa o CompanyID da sessão
+      CompanyID: req.session.selectedCompanyID, // Uses session CompanyID
       CategoryID: categoryId,
-      RoleID: roleId || null // Adiciona o RoleID
+      RoleID: roleId || null,
+      attend // Add attend to new document
     });
     await eventType.save();
     res.redirect('/admin/event-types');

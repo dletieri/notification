@@ -422,7 +422,7 @@ app.get('/admin', async (req, res) => {
 app.get('/admin/login', (req, res) => {
   console.log('Rendering login page, error:', null);
   console.log('Session on login GET:', req.session);
-  res.render('login', { title: 'Login - Notify.ME', 
+  res.render('login', { title: 'Login - UPfy.ME', 
       error: null,
       returnTo: req.query.returnTo || '' // Pass returnTo from query string
    });

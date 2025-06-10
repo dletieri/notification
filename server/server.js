@@ -390,7 +390,7 @@ app.get('/admin', async (req, res) => {
 
     // Pass yAxisMax to the template
     res.render('admin', {
-      title: 'Dashboard - SB Admin',
+      title: 'Dashboard - UPfy.me',
       user: user,
       currentPage: 'admin',
       selectedCompanyID: selectedCompanyID,
@@ -446,7 +446,7 @@ app.post('/admin/login', async (req, res) => {
     } else {
       console.log('Login failed, error:', 'Invalid email or password');
       res.status(401).render('login', {
-        title: 'Login - SB Admin',
+        title: 'Login - UPfy.me',
         error: 'Invalid email or password'
       });
     }
@@ -482,7 +482,7 @@ app.get('/admin/companies', async (req, res) => {
   }
 
   res.render('companies', {
-    title: 'Companies - SB Admin',
+    title: 'Companies - UPfy.me',
     user: user,
     currentPage: 'companies',
     selectedCompanyID: req.session.selectedCompanyID || null,
@@ -510,7 +510,7 @@ app.get('/admin/categories', async (req, res) => {
     : [];
 
   res.render('categories', {
-    title: 'Categories - SB Admin',
+    title: 'Categories - UPfy.me',
     user: user,
     currentPage: 'categories',
     selectedCompanyID: req.session.selectedCompanyID || null,
@@ -535,7 +535,7 @@ app.get('/admin/categories/edit/:id', async (req, res) => {
 
   if (req.params.id === 'new') {
     res.render('category-edit', {
-      title: 'Add Category - SB Admin',
+      title: 'Add Category - UPfy.me',
       user: user,
       category: {},
       currentPage: 'categories',
@@ -548,7 +548,7 @@ app.get('/admin/categories/edit/:id', async (req, res) => {
     const category = await Category.findById(req.params.id).lean();
     if (!category) return res.status(404).send('Category not found');
     res.render('category-edit', {
-      title: 'Edit Category - SB Admin',
+      title: 'Edit Category - UPfy.me',
       user: user,
       category: category,
       currentPage: 'categories',
@@ -635,7 +635,7 @@ app.get('/admin/environment-objects', async (req, res) => {
   }
 
   res.render('environment-objects', {
-    title: 'Environment Objects - SB Admin',
+    title: 'Environment Objects - UPfy.me',
     user: user,
     envObjects: envObjects,
     currentPage: 'environment-objects',
@@ -666,7 +666,7 @@ app.get('/admin/environment-objects/edit/:id', async (req, res) => {
 
   if (req.params.id === 'new') {
     res.render('environment-object-edit', {
-      title: 'Add Environment Object - SB Admin',
+      title: 'Add Environment Object - UPfy.me',
       user: user,
       environmentObject: {},
       categories: categories,
@@ -680,7 +680,7 @@ app.get('/admin/environment-objects/edit/:id', async (req, res) => {
     const environmentObject = await EnvironmentObject.findById(req.params.id).lean();
     if (!environmentObject) return res.status(404).send('Environment object not found');
     res.render('environment-object-edit', {
-      title: 'Edit Environment Object - SB Admin',
+      title: 'Edit Environment Object - UPfy.me',
       user: user,
       environmentObject: environmentObject,
       categories: categories,
@@ -753,7 +753,7 @@ app.get('/admin/event-types', async (req, res) => {
   }
 
   res.render('event-types', {
-    title: 'Event Types - SB Admin',
+    title: 'Event Types - UPfy.me',
     user: user,
     currentPage: 'event-types',
     selectedCompanyID: req.session.selectedCompanyID || null,
@@ -791,7 +791,7 @@ app.get('/admin/event-types/edit/:id', async (req, res) => {
 
   if (req.params.id === 'new') {
     res.render('event-type-edit', {
-      title: 'Add Event Type - SB Admin',
+      title: 'Add Event Type - UPfy.me',
       user: user,
       eventType: {},
       categories: categories,
@@ -806,7 +806,7 @@ app.get('/admin/event-types/edit/:id', async (req, res) => {
     const eventType = await EventType.findById(req.params.id).lean();
     if (!eventType) return res.status(404).send('Event Type not found');
     res.render('event-type-edit', {
-      title: 'Edit Event Type - SB Admin',
+      title: 'Edit Event Type - UPfy.me',
       user: user,
       eventType: eventType,
       categories: categories,
@@ -880,7 +880,7 @@ app.get('/admin/users', async (req, res) => {
   }
 
   res.render('users', {
-    title: 'Users - SB Admin',
+    title: 'Users - UPfy.me',
     user: user,
     users: users,
     currentPage: 'users',
@@ -911,7 +911,7 @@ app.get('/admin/users/edit/:id', async (req, res) => {
 
   if (req.params.id === 'new') {
     res.render('user-edit', {
-      title: 'Add User - SB Admin',
+      title: 'Add User - UPfy.me',
       user: user,
       editUser: {},
       companies: companies,
@@ -927,7 +927,7 @@ app.get('/admin/users/edit/:id', async (req, res) => {
     const editUser = await User.findById(req.params.id).populate('Companies', 'Name').populate('Roles', 'Name').lean();
     if (!editUser) return res.status(404).send('User not found');
     res.render('user-edit', {
-      title: 'Edit User - SB Admin',
+      title: 'Edit User - UPfy.me',
       user: user,
       editUser: editUser,
       companies: companies,
@@ -959,7 +959,7 @@ app.post('/admin/users/edit/:id', async (req, res) => {
         selectedCompany = await Company.findById(req.session.selectedCompanyID).lean();
       }
       return res.render('user-edit', {
-        title: 'Edit User - SB Admin',
+        title: 'Edit User - UPfy.me',
         user: user,
         editUser: { Email: email, Name: name, Phone: phone, Role: role, IsAdmin: isAdmin === 'on', DefaultCompanyID: defaultCompanyID, Companies: companies, Roles: roles },
         companies: companiesList,
@@ -995,7 +995,7 @@ app.post('/admin/users/edit/:id', async (req, res) => {
       selectedCompany = await Company.findById(req.session.selectedCompanyID).lean();
     }
     res.render('user-edit', {
-      title: 'Edit User - SB Admin',
+      title: 'Edit User - UPfy.me',
       user: user,
       editUser: { Email: email, Name: name, Phone: phone, Role: role, IsAdmin: isAdmin === 'on', DefaultCompanyID: defaultCompanyID, Companies: companies, Roles: roles },
       companies: companiesList,
@@ -1027,7 +1027,7 @@ app.post('/admin/users/add', async (req, res) => {
         selectedCompany = await Company.findById(req.session.selectedCompanyID).lean();
       }
       return res.render('user-edit', {
-        title: 'Add User - SB Admin',
+        title: 'Add User - UPfy.me',
         user: user,
         editUser: { Email: email, Name: name, Phone: phone, Role: role, IsAdmin: isAdmin === 'on', DefaultCompanyID: defaultCompanyID, Companies: companies, Roles: roles },
         companies: companiesList,
@@ -1064,7 +1064,7 @@ app.post('/admin/users/add', async (req, res) => {
       selectedCompany = await Company.findById(req.session.selectedCompanyID).lean();
     }
     res.render('user-edit', {
-      title: 'Add User - SB Admin',
+      title: 'Add User - UPfy.me',
       user: user,
       editUser: { Email: email, Name: name, Phone: phone, Role: role, IsAdmin: isAdmin === 'on', DefaultCompanyID: defaultCompanyID, Companies: companies, Roles: roles },
       companies: companiesList,
@@ -1116,7 +1116,7 @@ app.get('/admin/roles', async (req, res) => {
   }
 
   res.render('roles', {
-    title: 'Roles - SB Admin',
+    title: 'Roles - UPfy.me',
     user: user,
     roles: roles,
     currentPage: 'roles',
@@ -1141,7 +1141,7 @@ app.get('/admin/roles/edit/:id', async (req, res) => {
 
   if (req.params.id === 'new') {
     res.render('role-edit', {
-      title: 'Add Role - SB Admin',
+      title: 'Add Role - UPfy.me',
       user: user,
       role: {},
       currentPage: 'roles',
@@ -1155,7 +1155,7 @@ app.get('/admin/roles/edit/:id', async (req, res) => {
     const role = await Role.findById(req.params.id).populate('CompanyID', 'Name').lean();
     if (!role) return res.status(404).send('Role not found');
     res.render('role-edit', {
-      title: 'Edit Role - SB Admin',
+      title: 'Edit Role - UPfy.me',
       user: user,
       role: role,
       currentPage: 'roles',
@@ -1190,7 +1190,7 @@ app.post('/admin/roles/edit/:id', async (req, res) => {
       selectedCompany = await Company.findById(req.session.selectedCompanyID).lean();
     }
     res.render('role-edit', {
-      title: 'Edit Role - SB Admin',
+      title: 'Edit Role - UPfy.me',
       user: user,
       role: { Name: name, Description: description, CompanyID: req.session.selectedCompanyID },
       currentPage: 'roles',
@@ -1225,7 +1225,7 @@ app.post('/admin/roles/add', async (req, res) => {
       selectedCompany = await Company.findById(req.session.selectedCompanyID).lean();
     }
     res.render('role-edit', {
-      title: 'Add Role - SB Admin',
+      title: 'Add Role - UPfy.me',
       user: user,
       role: { Name: name, Description: description, CompanyID: req.session.selectedCompanyID },
       currentPage: 'roles',
@@ -1300,7 +1300,7 @@ app.get('/admin/companies/edit/:id', async (req, res) => {
   }
 
   res.render('company-edit', {
-    title: companyId === 'new' ? 'Add Company - SB Admin' : 'Edit Company - SB Admin',
+    title: companyId === 'new' ? 'Add Company - UPfy.me' : 'Edit Company - UPfy.me',
     user: req.session.user,
     company: company,
     currentPage: 'companies',
@@ -1331,7 +1331,7 @@ app.post('/admin/companies/edit/:id', async (req, res) => {
       selectedCompany = await Company.findById(selectedCompanyID).lean();
     }
     return res.render('company-edit', {
-      title: 'Add Company - SB Admin',
+      title: 'Add Company - UPfy.me',
       user: req.session.user,
       company: { Name: name, CompanyRegistrationNumber: registrationNumber, Address: address, Phone: phone, Email: email },
       currentPage: 'companies',
@@ -1372,7 +1372,7 @@ app.post('/admin/companies/edit/:id', async (req, res) => {
       selectedCompany = await Company.findById(selectedCompanyID).lean();
     }
     res.render('company-edit', {
-      title: 'Add Company - SB Admin',
+      title: 'Add Company - UPfy.me',
       user: req.session.user,
       company: { Name: name, CompanyRegistrationNumber: registrationNumber, Address: address, Phone: phone, Email: email },
       currentPage: 'companies',
